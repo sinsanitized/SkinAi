@@ -1,0 +1,28 @@
+ .result-container{
+  max-width:1100px;
+  margin:0 auto;
+  padding:24px;
+}
+.title{ text-align:center; margin-bottom:20px;}
+.topRow{ display:flex; gap:16px; flex-wrap:wrap; justify-content:center; }
+.photoCard, .summaryCard{ background:#0f0f12; border:1px solid #2a2a33; border-radius:16px; padding:16px; }
+.photo{ width:320px; max-width:100%; border-radius:12px; display:block;}
+.summaryCard{ flex:1; min-width:320px; max-width:650px;}
+.pill{ display:inline-block; padding:8px 12px; border-radius:999px; border:1px solid #2a2a33; margin:8px 0 16px;}
+.concern{ padding:10px 0; border-top:1px solid #2a2a33;}
+.concernName{ font-weight:700;}
+.concernMeta{ opacity:.85; font-size:.9rem;}
+.concernEvidence{ opacity:.8; margin-top:4px; font-size:.9rem;}
+.grid{ display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:16px; margin-top:16px;}
+.card{ background:#0f0f12; border:1px solid #2a2a33; border-radius:16px; padding:16px;}
+.routineBlock{ margin-top:10px;}
+.list{ list-style:none; padding:0; margin:0;}
+.list li{ padding:10px 0; border-top:1px solid #2a2a33;}
+.itemTitle{ font-weight:700; display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+.tag{ font-size:.75rem; padding:2px 8px; border:1px solid #2a2a33; border-radius:999px; opacity:.85;}
+.itemBody{ opacity:.85; margin-top:4px;}
+.itemHow{ opacity:.85; margin-top:6px;}
+.itemCaution{ color:#ffcf66; margin-top:6px; font-size:.9rem;}
+.muted{ opacity:.7;}
+.start-over-btn{ display:block; margin:22px auto 0; padding:12px 16px; border-radius:12px; border:1px solid #2a2a33; background:#15151a; color:#fff; cursor:pointer;}
+.start-over-btn:hover{ filter:brightness(1.1);}

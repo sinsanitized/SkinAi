@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "types": ["vite/client"],
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+    "composite": true,
+    "paths": {
+      "@skinai/shared-types": ["../../packages/shared-types/src"],
+      "@skinai/utils": ["../../packages/utils/src"]
+    }
+  },
+  "include": ["src", "../api/src/utils/intensityUtils.ts"],
+  "references": [
+    { "path": "../../packages/shared-types" },
+    { "path": "../../packages/utils" }
+  ]
+}
