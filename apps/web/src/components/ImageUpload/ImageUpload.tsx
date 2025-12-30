@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import "./ImageUpload.css";
 
 interface Props {
@@ -11,16 +11,56 @@ export const ImageUpload: React.FC<Props> = ({
   onRemove,
 }) => {
   const [preview, setPreview] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const handleFiles = (files: FileList | null) => {
-    if (!files || files.length === 0) return;
+  // webcam UI state
+  const [showWebcam, setShowWebcam] = useState(false);
+  const [webcamError, setWebcamError] = useState<string | null>(null);
 
-    const file = files[0];
-    setPreview(URL.createObjectURL(file));
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  // Two inputs = safest Safari + Chrome behavior for file picking
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
+  const libraryInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Clean up object URLs + webcam stream
+  useEffect(() => {
+    return () => {
+      if (preview) URL.revokeObjectURL(preview);
+      stopWebcam();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const setPreviewFromFile = (file: File) => {
+    setPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
+  };
+
+  const handleFile = (file: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return;
+
+    setPreviewFromFile(file);
     onImagesSelected([file]);
   };
 
+  const onCameraChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    handleFile(e.target.files?.[0] ?? null);
+    e.target.value = "";
+  };
+
+  const onLibraryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    handleFile(e.target.files?.[0] ?? null);
+    e.target.value = "";
+  };
+
+  const openMobileCamera = () => cameraInputRef.current?.click();
+  const openLibrary = () => libraryInputRef.current?.click();
+
+  // Drag & drop
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -29,16 +69,86 @@ export const ImageUpload: React.FC<Props> = ({
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    handleFiles(e.dataTransfer.files);
+    const file = e.dataTransfer.files?.[0];
+    if (!file || !file.type.startsWith("image/")) return;
+    handleFile(file);
   };
 
   const handleRemove = () => {
-    setPreview(null);
-    if (onRemove) onRemove();
+    setPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+    onRemove?.();
   };
 
-  const handleReplace = () => {
-    fileInputRef.current?.click();
+  // ---- Webcam (desktop) ----
+  const startWebcam = async () => {
+    setWebcamError(null);
+
+    // must be HTTPS or localhost
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setWebcamError("Webcam is not supported in this browser.");
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user" }, // "environment" if you want rear camera on supported devices
+        audio: false,
+      });
+
+      streamRef.current = stream;
+      setShowWebcam(true);
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+    } catch (err: any) {
+      setWebcamError(
+        err?.name === "NotAllowedError"
+          ? "Camera permission denied. Please allow camera access."
+          : "Could not access the camera."
+      );
+      setShowWebcam(false);
+    }
+  };
+
+  const stopWebcam = () => {
+    const stream = streamRef.current;
+    if (stream) {
+      stream.getTracks().forEach((t) => t.stop());
+    }
+    streamRef.current = null;
+    setShowWebcam(false);
+  };
+
+  const captureFromWebcam = async () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    // Convert canvas to File
+    const blob: Blob | null = await new Promise((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", 0.92)
+    );
+    if (!blob) return;
+
+    const file = new File([blob], `webcam-${Date.now()}.jpg`, {
+      type: "image/jpeg",
+    });
+
+    stopWebcam();
+    handleFile(file);
   };
 
   return (
@@ -47,28 +157,137 @@ export const ImageUpload: React.FC<Props> = ({
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
-      {!preview && (
-        <label
-          className="image-upload-input"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <input
-            type="file"
-            accept="image/*"
-            hidden
-            ref={fileInputRef}
-            onChange={(e) => handleFiles(e.target.files)}
-          />
-          <span>Upload or Drag & Drop a photo</span>
-        </label>
-      )}
+      {/* Mobile camera hint input */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        hidden
+        onChange={onCameraChange}
+      />
 
-      {preview && (
+      {/* Library input */}
+      <input
+        ref={libraryInputRef}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={onLibraryChange}
+      />
+
+      {!preview ? (
+        <div className="image-upload-input" style={{ width: "100%" }}>
+          {/* Drag & drop box */}
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={openLibrary}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") openLibrary();
+            }}
+            style={{
+              width: "100%",
+              maxWidth: 520,
+              cursor: "pointer",
+              padding: "1.25rem",
+              border: "2px dashed #d1d5db",
+              borderRadius: "10px",
+              textAlign: "center",
+            }}
+          >
+            <strong>Upload a photo</strong>
+            <div style={{ marginTop: "0.25rem", opacity: 0.75 }}>
+              Drag & drop on desktop or tap to choose
+            </div>
+          </div>
+
+          {/* Buttons UNDER the box */}
+          <div
+            style={{
+              marginTop: "1rem",
+              display: "flex",
+              gap: "0.75rem",
+              justifyContent: "center",
+              flexWrap: "wrap",
+            }}
+          >
+            <button type="button" onClick={openMobileCamera}>
+              Take Photo (Mobile)
+            </button>
+            <button type="button" onClick={openLibrary}>
+              Choose Photo
+            </button>
+            <button type="button" onClick={startWebcam}>
+              Use Webcam (Desktop)
+            </button>
+          </div>
+
+          {webcamError && (
+            <div style={{ marginTop: "0.75rem", color: "#b91c1c" }}>
+              {webcamError}
+            </div>
+          )}
+
+          {showWebcam && (
+            <div
+              style={{
+                marginTop: "1rem",
+                width: "100%",
+                maxWidth: 520,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "0.75rem",
+              }}
+            >
+              <video
+                ref={videoRef}
+                playsInline
+                muted
+                style={{
+                  width: "100%",
+                  borderRadius: "10px",
+                  border: "1px solid #d1d5db",
+                }}
+              />
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <button type="button" onClick={captureFromWebcam}>
+                  Capture
+                </button>
+                <button type="button" onClick={stopWebcam}>
+                  Cancel
+                </button>
+              </div>
+              <div style={{ fontSize: 12, opacity: 0.7, textAlign: "center" }}>
+                Webcam requires HTTPS (or localhost) and camera permission.
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
         <div className="image-upload-preview-wrapper">
-          <img src={preview} className="image-upload-preview" />
-          <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
-            <button onClick={handleReplace}>Replace</button>
+          <img src={preview} className="image-upload-preview" alt="preview" />
+          <div
+            style={{
+              marginTop: "0.75rem",
+              display: "flex",
+              gap: "0.5rem",
+              justifyContent: "center",
+              flexWrap: "wrap",
+            }}
+          >
+            <button type="button" onClick={openLibrary}>
+              Replace (Choose)
+            </button>
+            <button type="button" onClick={openMobileCamera}>
+              Replace (Mobile Camera)
+            </button>
+            <button type="button" onClick={startWebcam}>
+              Replace (Webcam)
+            </button>
             <button
+              type="button"
               onClick={handleRemove}
               style={{ backgroundColor: "#e02424", color: "white" }}
             >

@@ -12,5 +12,5 @@ export function getOpenAIClient() {
 
 // Optional: keep config constants here if you use embeddings
 export const EMBEDDING_CONFIG = {
-  model: "text-embedding-3-large",
+  model: "text-embedding-3-small",
 };
