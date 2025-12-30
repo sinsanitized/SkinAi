@@ -93,22 +93,23 @@ export const ImageUpload: React.FC<Props> = ({
     }
 
     try {
+      // If a stream is already running, stop it first
+      if (streamRef.current) stopWebcam();
+
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user" }, // "environment" if you want rear camera on supported devices
+        video: { facingMode: "user" },
         audio: false,
       });
 
       streamRef.current = stream;
+      // IMPORTANT: show the webcam UI first so the <video> mounts
       setShowWebcam(true);
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
     } catch (err: any) {
       setWebcamError(
         err?.name === "NotAllowedError"
           ? "Camera permission denied. Please allow camera access."
+          : err?.name === "NotFoundError"
+          ? "No camera device found."
           : "Could not access the camera."
       );
       setShowWebcam(false);
@@ -121,23 +122,76 @@ export const ImageUpload: React.FC<Props> = ({
       stream.getTracks().forEach((t) => t.stop());
     }
     streamRef.current = null;
+
+    // Detach from video element (prevents stale black frame)
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+
     setShowWebcam(false);
   };
+
+  /**
+   * Attach stream to <video> AFTER the webcam UI is rendered.
+   * This fixes the "double click" issue.
+   */
+  useEffect(() => {
+    const attachAndPlay = async () => {
+      if (!showWebcam) return;
+
+      const video = videoRef.current;
+      const stream = streamRef.current;
+      if (!video || !stream) return;
+
+      try {
+        video.muted = true;
+        video.playsInline = true;
+
+        // Attach stream
+        if (video.srcObject !== stream) {
+          video.srcObject = stream;
+        }
+
+        // Wait for metadata so videoWidth/videoHeight are ready
+        await new Promise<void>((resolve) => {
+          if (video.readyState >= 1) return resolve(); // HAVE_METADATA
+          video.onloadedmetadata = () => resolve();
+        });
+
+        // Some browsers need a microtask tick before play
+        await Promise.resolve();
+
+        await video.play();
+      } catch (err: any) {
+        console.warn("Video play failed:", err);
+        setWebcamError(
+          "Webcam started, but playback was blocked. Try allowing autoplay or click Capture after it appears."
+        );
+      }
+    };
+
+    attachAndPlay();
+  }, [showWebcam]);
 
   const captureFromWebcam = async () => {
     const video = videoRef.current;
     if (!video) return;
 
+    // If metadata hasn't loaded yet, don't capture a 0x0 frame
+    if (!video.videoWidth || !video.videoHeight) {
+      setWebcamError("Camera is still loading—try again in a moment.");
+      return;
+    }
+
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    // Convert canvas to File
     const blob: Blob | null = await new Promise((resolve) =>
       canvas.toBlob(resolve, "image/jpeg", 0.92)
     );
@@ -243,6 +297,7 @@ export const ImageUpload: React.FC<Props> = ({
             >
               <video
                 ref={videoRef}
+                autoPlay
                 playsInline
                 muted
                 style={{

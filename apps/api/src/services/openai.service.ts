@@ -51,6 +51,7 @@ export class OpenAIService {
 
   /**
    * Skin-focused description used for embeddings + optional retrieval.
+   * Goal: produce structured, region-aware observations (not diagnosis, not advice).
    */
   async describeSkinInImage(
     imageBase64: string,
@@ -70,27 +71,27 @@ export class OpenAIService {
 Describe ONLY observable facial skin features from the image.
 
 INSTRUCTIONS:
-- Focus on skin, not attractiveness or identity.
+- Focus on skin only; avoid identity/attractiveness.
 - Do NOT diagnose medical conditions.
 - Be precise, neutral, and uncertainty-aware.
 
 INCLUDE:
-1) Skin findings by facial region (forehead, cheeks, nose/T-zone, jaw/chin, under-eyes).
+1) Findings by facial region (forehead, cheeks, nose/T-zone, jaw/chin, under-eyes).
 2) Lesion types if present (comedones, papules, pustules, cyst-like bumps, marks).
 3) Redness/erythema, hyperpigmentation, texture irregularities, pore visibility.
 4) Oil/shine vs dryness/dehydration cues.
 5) Relative severity (mild / moderate / pronounced).
 6) Symmetry or clustering patterns.
-7) Image quality notes that affect certainty (lighting, blur, angle).
+7) Image quality notes affecting certainty (lighting, blur, angle).
 
 EXCLUDE:
-- Judgments of attractiveness
 - Causes or diagnoses
 - Treatment advice
+- Attractiveness judgments
 
 FORMAT:
-Return a concise paragraph or short bullet-style sentences describing what is visible and where.
-If something is not clearly visible, state that explicitly.
+Return short bullet-style sentences or a concise paragraph describing what is visible and where.
+If something is not clearly visible, explicitly say that.
 `,
             },
             {
@@ -100,20 +101,22 @@ If something is not clearly visible, state that explicitly.
           ],
         },
       ],
-      max_tokens: 450,
+      max_tokens: 500,
       temperature: 0.2,
     });
 
     const description = response.choices[0]?.message?.content || "";
-    if (!description) {
+    if (!description)
       throw new Error("No description returned from vision model");
-    }
-    console.log("Image description for embedding:", description);
+
     return description;
   }
 
   /**
-   * Build a stronger prompt that forces richer routines + weekly schedule + product slots.
+   * Build a stronger prompt that forces:
+   * - richer routines (AM/PM)
+   * - a DAILY BASE + ACTIVE CYCLE schedule (Mon–Sun) inside routine.weekly
+   * - product "slots" so the output is actionable
    */
   private buildSkinPrompt(args: {
     prefs: {
@@ -141,13 +144,13 @@ USER PREFERENCES (must be respected):
 - budget: "${prefs.budget || "mid-range"}"
 - fragranceFree: ${
       prefs.fragranceFree
-    } (if true, prioritize fragrance-free options; mention uncertainty)
+    } (if true, prioritize fragrance-free; if unsure, say "may contain fragrance")
 - pregnancySafe: ${
       prefs.pregnancySafe
-    } (if true, avoid retinoids and other pregnancy-contraindicated actives; when unsure, choose safer alternatives)
+    } (if true, avoid retinoids; choose safer alternatives when uncertain)
 - sensitiveMode: ${
       prefs.sensitiveMode
-    } (if true, simplify routine, reduce actives, slower ramp)
+    } (if true, simplify routine, fewer actives, slower ramp)
 
 ${houseContext}
 
@@ -163,16 +166,22 @@ QUALITY RULES (IMPORTANT):
    - a CATEGORY (cleanser/toner/serum/moisturizer/sunscreen/etc),
    - a FREQUENCY (daily / 2x-week / etc),
    - and a SHORT CONDITION (e.g., "skip if stinging", "only on non-retinoid nights").
-4) routine.weekly is REQUIRED and must include:
-   - a simple actives schedule (e.g., "Retinoid nights: Mon/Thu", "Exfoliation: Sat", "Barrier nights: other nights")
-   - a 4-week ramp-up guide if using any active (retinoid, AHA/BHA, vitamin C, benzoyl peroxide, azelaic acid, TXA).
+4) routine.weekly is REQUIRED and must include ALL of the following (use these exact prefixes):
+   - "Daily base (AM): ..." (a one-line base plan used every morning)
+   - "Daily base (PM): ..." (a one-line base plan used every night before/after actives)
+   - "Active cycle (Mon–Sun): Mon ... | Tue ... | Wed ... | Thu ... | Fri ... | Sat ... | Sun ..."
+     * Each day must be labeled as either a Treatment night (which active) or Barrier night (soothing/recovery).
+     * If pregnancySafe=true, do NOT include retinoids in the cycle.
+     * If sensitiveMode=true, start with 1–2 treatment nights/week and more barrier nights.
+   - "Ramp-up (4 weeks): Weeks 1–2 ...; Weeks 3–4 ...; Maintenance ..."
+   - "Rules: ..." (when to pause, patch test notes, irritation guidance)
 5) Products: recommend by SLOTS so it’s actionable (don’t list random items).
-   - Must include at least:
-     - 1 gentle cleanser option
-     - 1 moisturizer option (and if oily/acne-prone, optionally a lighter gel option)
-     - 1 sunscreen option
-     - 1 targeted active serum/treatment aligned to top concern
-   - You may include 1–2 alternates per slot based on budget/fragranceFree/sensitiveMode.
+   Must include at least:
+   - Cleanser (gentle) 1–2 options
+   - Moisturizer 1–2 options (optionally a lighter gel if oily/acne-prone)
+   - Sunscreen 1–2 options
+   - Targeted treatment/serum aligned to top concern 1–2 options
+   Optional: spot treatment / mask
 6) Do not invent brands. Prefer widely available K-beauty brands. If uncertain, choose safe mainstream options.
 7) Conflicts must include concrete “do not combine same night” warnings relevant to ingredients you recommended.
 
@@ -191,10 +200,11 @@ Return JSON ONLY matching this exact shape:
     "AM": ["..."],
     "PM": ["..."],
     "weekly": [
-      "Active schedule: ...",
-      "Weeks 1–2: ...",
-      "Weeks 3–4: ...",
-      "Maintenance: ..."
+      "Daily base (AM): ...",
+      "Daily base (PM): ...",
+      "Active cycle (Mon–Sun): Mon ... | Tue ... | Wed ... | Thu ... | Fri ... | Sat ... | Sun ...",
+      "Ramp-up (4 weeks): Weeks 1–2 ...; Weeks 3–4 ...; Maintenance ...",
+      "Rules: ..."
     ]
   },
   "conflicts": [{"ingredients": ["...","..."], "warning": "..."}],
@@ -205,7 +215,7 @@ Return JSON ONLY matching this exact shape:
 FINAL CHECK BEFORE YOU ANSWER:
 - Valid JSON only
 - AM length 5–7 and PM length 6–9 (unless sensitiveMode allows shorter)
-- routine.weekly includes active schedule + ramp-up
+- routine.weekly includes Daily base + Active cycle + Ramp-up + Rules
 - at least 4 product slots covered
 `;
   }
@@ -217,14 +227,31 @@ FINAL CHECK BEFORE YOU ANSWER:
   private assertRichEnough(json: SkinAnalysisResponse): void {
     const amLen = json?.routine?.AM?.length ?? 0;
     const pmLen = json?.routine?.PM?.length ?? 0;
-    const weeklyLen = json?.routine?.weekly?.length ?? 0;
+    const weeklyArr = json?.routine?.weekly ?? [];
+    const weeklyText = weeklyArr.join(" ").toLowerCase();
     const productsLen = (json as any)?.products?.length ?? 0;
 
     if (amLen < 4 || pmLen < 5) {
       throw new Error(`Routine too short (AM=${amLen}, PM=${pmLen})`);
     }
-    if (weeklyLen < 2) {
+    if ((weeklyArr?.length ?? 0) < 3) {
       throw new Error("Weekly plan missing/too short");
+    }
+    // Require daily base + active cycle to exist (enforced by prefixes)
+    if (
+      !weeklyText.includes("daily base (am)") ||
+      !weeklyText.includes("daily base (pm)")
+    ) {
+      throw new Error("Weekly plan missing Daily base (AM/PM)");
+    }
+    if (!weeklyText.includes("active cycle")) {
+      throw new Error("Weekly plan missing Active cycle");
+    }
+    if (!weeklyText.includes("ramp-up") && !weeklyText.includes("ramp up")) {
+      throw new Error("Weekly plan missing Ramp-up");
+    }
+    if (!weeklyText.includes("rules:")) {
+      throw new Error("Weekly plan missing Rules");
     }
     if (productsLen < 4) {
       throw new Error("Not enough product slots covered");
@@ -277,7 +304,7 @@ FINAL CHECK BEFORE YOU ANSWER:
       model: "gpt-4o-mini",
       messages: [userMessage],
       temperature: 0.4,
-      max_tokens: 1400,
+      max_tokens: 1600,
     });
 
     const text1 = response1.choices?.[0]?.message?.content || "";
@@ -300,16 +327,14 @@ FINAL CHECK BEFORE YOU ANSWER:
           },
         ],
         temperature: 0.2,
-        max_tokens: 1400,
+        max_tokens: 1600,
       });
 
       const textFix = responseFix.choices?.[0]?.message?.content || "";
       json = extractJSON<SkinAnalysisResponse>(textFix);
     }
 
-    if (!json) {
-      throw new Error("Model returned unparseable JSON");
-    }
+    if (!json) throw new Error("Model returned unparseable JSON");
 
     // Ensure timestamp
     if (!(json as any).timestamp)
@@ -331,27 +356,24 @@ FINAL CHECK BEFORE YOU ANSWER:
             content: [
               {
                 type: "text",
-                text: "Your last output was too generic/short. Expand with specific step frequencies, conditions (when to skip), a clear weekly actives schedule, a 4-week ramp-up plan, and product recommendations by slot. Return valid JSON only.",
+                text: "Your last output was too generic/short. Expand with specific step frequencies and conditions, and ensure routine.weekly includes: Daily base (AM), Daily base (PM), Active cycle (Mon–Sun) with treatment vs barrier nights, Ramp-up (4 weeks), and Rules. Recommend products by slot. Return valid JSON only.",
               },
             ],
           },
         ],
         temperature: 0.35,
-        max_tokens: 1600,
+        max_tokens: 1800,
       });
 
       const text2 = response2.choices?.[0]?.message?.content || "";
       const json2 = extractJSON<SkinAnalysisResponse>(text2);
 
-      if (!json2) {
-        // fall back to first valid JSON
-        return json;
-      }
+      if (!json2) return json;
 
       if (!(json2 as any).timestamp)
         (json2 as any).timestamp = new Date().toISOString();
 
-      // If still not rich enough, return json2 anyway (better attempt), or fallback.
+      // Return retry output even if still imperfect
       try {
         this.assertRichEnough(json2);
         return json2;
