@@ -1,6 +1,7 @@
 # SkinAI 🧴
 
 SkinAI is an AI-powered web app that analyzes an uploaded **face photo** and returns:
+
 - **Skin type** estimate (with confidence)
 - **Visible concerns** (acne, redness, PIH/PIE, texture, etc.)
 - **Ingredient recommendations** (with cautions)
@@ -20,12 +21,14 @@ SkinAI is an AI-powered web app that analyzes an uploaded **face photo** and ret
 ## Setup
 
 ### Prerequisites
+
 - Node.js v18+
 - OpenAI API key
 - (Optional) MongoDB
 - (Optional) Pinecone index + key
 
 ### Install
+
 ```bash
 npm install
 ```
@@ -45,6 +48,7 @@ PINECONE_INDEX_NAME=...
 ```
 
 ### Run
+
 ```bash
 npm run dev
 ```
@@ -58,7 +62,6 @@ API: `http://localhost:3000`
 - `POST /api/skin/analyze` (multipart form-data)
   - `image` (file) required
   - `goals` (string) optional
-  - `budget` ("Drugstore" | "Mid" | "Premium") optional
   - `fragranceFree` (boolean) optional
   - `pregnancySafe` (boolean) optional
   - `sensitiveMode` (boolean) optional

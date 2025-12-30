@@ -121,7 +121,8 @@ If something is not clearly visible, explicitly say that.
   private buildSkinPrompt(args: {
     prefs: {
       goals: string;
-      budget: string;
+      age?: number;
+      valueFocus: "best_value" | "midrange_worth_it" | "splurge_if_unique";
       fragranceFree: boolean;
       pregnancySafe: boolean;
       sensitiveMode: boolean;
@@ -139,9 +140,14 @@ ROLE + STYLE:
 - Do NOT diagnose diseases.
 - If the photo is unclear, say so and reduce confidence, but still provide a safe minimal routine.
 
-USER PREFERENCES (must be respected):
+USER CONTEXT (must be respected):
 - goals: "${prefs.goals}"
-- budget: "${prefs.budget || "mid-range"}"
+- age: ${
+      typeof prefs.age === "number" ? prefs.age : "unknown"
+    } (use age to adjust routine intensity + product selection)
+- valueFocus: "${
+      prefs.valueFocus
+    }" (optimize for *worth it* / best value — NOT just cheapest)
 - fragranceFree: ${
       prefs.fragranceFree
     } (if true, prioritize fragrance-free; if unsure, say "may contain fragrance")
@@ -157,6 +163,19 @@ ${houseContext}
 TASK:
 Analyze ONLY visible facial skin characteristics and produce a structured JSON report matching the exact schema below.
 Output MUST be VALID JSON ONLY. No markdown. No commentary.
+
+VALUE RULE (CRITICAL):
+Recommend “worth it” products: prioritize proven formulas, high-evidence actives, appropriate concentrations, good tolerability, and reliable brands.
+- Do NOT blindly pick the cheapest products.
+- Prefer the best bang-for-buck items that perform like pricier options.
+- Only recommend higher-priced (“splurge”) items when there is a clear unique benefit vs cheaper alternatives (better filters, delivery system, exceptional tolerability, unique ingredient tech).
+- When multiple options work similarly, choose the best-value option.
+
+AGE GUIDANCE (CRITICAL):
+Use age to tailor intensity + focus:
+- If age is unknown, be conservative and avoid overly aggressive routines.
+- Generally: younger skin often needs simpler acne/oil control + barrier support; older skin may benefit more from pigmentation support, barrier support, and consistent retinoid use (unless pregnancySafe).
+- Always prioritize tolerance and safe ramp-up.
 
 QUALITY RULES (IMPORTANT):
 1) Routine MUST feel tailored to observed issues. Do NOT output generic routines.
@@ -231,7 +250,7 @@ FINAL CHECK BEFORE YOU ANSWER:
     const weeklyText = weeklyArr.join(" ").toLowerCase();
     const productsLen = (json as any)?.products?.length ?? 0;
 
-    if (amLen < 4 || pmLen < 5) {
+    if (amLen < 5 || pmLen < 6) {
       throw new Error(`Routine too short (AM=${amLen}, PM=${pmLen})`);
     }
     if ((weeklyArr?.length ?? 0) < 3) {
@@ -281,7 +300,15 @@ FINAL CHECK BEFORE YOU ANSWER:
 
     const prefs = {
       goals: userPrefs.goals || "",
-      budget: userPrefs.budget || "",
+      age:
+        typeof (userPrefs as any).age === "number"
+          ? (userPrefs as any).age
+          : undefined,
+      valueFocus:
+        ((userPrefs as any).valueFocus as
+          | "best_value"
+          | "midrange_worth_it"
+          | "splurge_if_unique") || "best_value",
       fragranceFree: !!userPrefs.fragranceFree,
       pregnancySafe: !!userPrefs.pregnancySafe,
       sensitiveMode: !!userPrefs.sensitiveMode,
@@ -356,7 +383,7 @@ FINAL CHECK BEFORE YOU ANSWER:
             content: [
               {
                 type: "text",
-                text: "Your last output was too generic/short. Expand with specific step frequencies and conditions, and ensure routine.weekly includes: Daily base (AM), Daily base (PM), Active cycle (Mon–Sun) with treatment vs barrier nights, Ramp-up (4 weeks), and Rules. Recommend products by slot. Return valid JSON only.",
+                text: 'Your last output was too generic/short. Expand with specific step frequencies and conditions, and ensure routine.weekly includes: Daily base (AM), Daily base (PM), Active cycle (Mon–Sun) with treatment vs barrier nights, Ramp-up (4 weeks), and Rules. Recommend products by slot and follow the "worth it / best value" rule. Return valid JSON only.',
               },
             ],
           },

@@ -68,10 +68,27 @@ export interface IngredientConflict {
   warning: string;
 }
 
+/**
+ * Controls how the recommender should think about price/value.
+ * - best_value: default bang-for-buck; proven actives, reliable basics
+ * - midrange_worth_it: allows a bit more spend for better textures/filters
+ * - splurge_if_unique: only spend more when there’s a clear unique advantage
+ */
+export type ValueFocus =
+  | "best_value"
+  | "midrange_worth_it"
+  | "splurge_if_unique";
+
 export interface SkinAnalysisRequest {
   // image is sent as multipart/form-data; these are optional form fields
   goals?: string; // e.g. "acne + dark spots"
-  budget?: "Drugstore" | "Mid" | "Premium";
+
+  // NEW: provide age context to tailor intensity + product type
+  age?: number; // e.g. 38
+
+  // NEW: replaces budget
+  valueFocus?: ValueFocus;
+
   fragranceFree?: boolean;
   pregnancySafe?: boolean;
   sensitiveMode?: boolean;

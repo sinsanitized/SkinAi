@@ -17,7 +17,15 @@ export class ApiService {
     formData.append("image", imageFile);
 
     if (prefs.goals) formData.append("goals", prefs.goals);
-    if (prefs.budget) formData.append("budget", prefs.budget);
+
+    // NEW
+    if (typeof (prefs as any).age === "number")
+      formData.append("age", String((prefs as any).age));
+
+    // NEW (optional, defaults server-side too)
+    if ((prefs as any).valueFocus)
+      formData.append("valueFocus", String((prefs as any).valueFocus));
+
     if (typeof prefs.fragranceFree === "boolean")
       formData.append("fragranceFree", String(prefs.fragranceFree));
     if (typeof prefs.pregnancySafe === "boolean")

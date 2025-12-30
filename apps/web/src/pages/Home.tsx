@@ -12,7 +12,10 @@ const Home: React.FC = () => {
 
   const [prefs, setPrefs] = useState<SkinAnalysisRequest>({
     goals: "",
-    budget: "Mid",
+    // NEW
+    age: 38 as any, // you can set undefined by default if you prefer
+    valueFocus: "best_value" as any,
+
     fragranceFree: false,
     pregnancySafe: false,
     sensitiveMode: false,
@@ -22,7 +25,6 @@ const Home: React.FC = () => {
 
   const handleAnalyze = async () => {
     if (!file) return alert("Please upload a face photo first!");
-
     setLoading(true);
 
     try {
@@ -60,22 +62,47 @@ const Home: React.FC = () => {
               className="context-input"
               placeholder='e.g. "acne + dark spots", "redness", "oil control"'
               value={prefs.goals || ""}
-              onChange={(e) => setPrefs((p) => ({ ...p, goals: e.target.value }))}
+              onChange={(e) =>
+                setPrefs((p) => ({ ...p, goals: e.target.value }))
+              }
             />
           </div>
 
           <div className="prefs-grid">
             <div className="pref">
-              <label>Budget</label>
+              <label>Age</label>
+              <input
+                type="number"
+                min={10}
+                max={90}
+                value={
+                  typeof (prefs as any).age === "number"
+                    ? (prefs as any).age
+                    : ""
+                }
+                onChange={(e) => {
+                  const n = Number(e.target.value);
+                  setPrefs((p) => ({
+                    ...p,
+                    age: Number.isFinite(n) ? (n as any) : (undefined as any),
+                  }));
+                }}
+              />
+            </div>
+
+            <div className="pref">
+              <label>Value focus</label>
               <select
-                value={prefs.budget || "Mid"}
+                value={(prefs as any).valueFocus || "best_value"}
                 onChange={(e) =>
-                  setPrefs((p) => ({ ...p, budget: e.target.value as any }))
+                  setPrefs((p) => ({ ...p, valueFocus: e.target.value as any }))
                 }
               >
-                <option value="Drugstore">Drugstore</option>
-                <option value="Mid">Mid</option>
-                <option value="Premium">Premium</option>
+                <option value="best_value">Best value (worth it)</option>
+                <option value="midrange_worth_it">Midrange worth it</option>
+                <option value="splurge_if_unique">
+                  Splurge only if unique
+                </option>
               </select>
             </div>
 
