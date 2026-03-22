@@ -9,30 +9,41 @@ import type {
 // In prod, set VITE_API_URL (e.g. https://api.yourdomain.com)
 const API_URL = import.meta.env.VITE_API_URL || "";
 
-export class ApiService {
+export class SkinAnalysisApi {
   async analyzeSkin(
     imageFile: File,
-    prefs: SkinAnalysisRequest = {}
+    analysisOptions: SkinAnalysisRequest = {}
   ): Promise<SkinAnalysisResponse> {
     const formData = new FormData();
     formData.append("image", imageFile);
 
-    if (prefs.goals) formData.append("goals", prefs.goals);
-
-    if (typeof prefs.age === "number") {
-      formData.append("age", String(prefs.age));
+    if (analysisOptions.goals) {
+      formData.append("goals", analysisOptions.goals);
     }
 
-    if (prefs.valueFocus) {
-      formData.append("valueFocus", prefs.valueFocus satisfies ValueFocus);
+    if (typeof analysisOptions.age === "number") {
+      formData.append("age", String(analysisOptions.age));
     }
 
-    if (typeof prefs.fragranceFree === "boolean")
-      formData.append("fragranceFree", String(prefs.fragranceFree));
-    if (typeof prefs.pregnancySafe === "boolean")
-      formData.append("pregnancySafe", String(prefs.pregnancySafe));
-    if (typeof prefs.sensitiveMode === "boolean")
-      formData.append("sensitiveMode", String(prefs.sensitiveMode));
+    if (analysisOptions.valueFocus) {
+      formData.append(
+        "valueFocus",
+        analysisOptions.valueFocus satisfies ValueFocus
+      );
+    }
+
+    if (typeof analysisOptions.fragranceFree === "boolean") {
+      formData.append(
+        "fragranceFree",
+        String(analysisOptions.fragranceFree)
+      );
+    }
+    if (typeof analysisOptions.pregnancySafe === "boolean") {
+      formData.append("pregnancySafe", String(analysisOptions.pregnancySafe));
+    }
+    if (typeof analysisOptions.sensitiveMode === "boolean") {
+      formData.append("sensitiveMode", String(analysisOptions.sensitiveMode));
+    }
 
     const response = await fetch(`${API_URL}/api/skin/analyze`, {
       method: "POST",
@@ -73,4 +84,4 @@ export class ApiService {
   }
 }
 
-export const apiService = new ApiService();
+export const skinAnalysisApi = new SkinAnalysisApi();

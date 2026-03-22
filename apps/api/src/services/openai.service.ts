@@ -119,7 +119,7 @@ If something is not clearly visible, explicitly say that.
    * - product "slots" so the output is actionable
    */
   private buildSkinPrompt(args: {
-    prefs: {
+    userPreferences: {
       goals: string;
       age?: number;
       valueFocus: "best_value" | "midrange_worth_it" | "splurge_if_unique";
@@ -127,9 +127,9 @@ If something is not clearly visible, explicitly say that.
       pregnancySafe: boolean;
       sensitiveMode: boolean;
     };
-    houseContext: string;
+    retrievalContextSummary: string;
   }): string {
-    const { prefs, houseContext } = args;
+    const { userPreferences, retrievalContextSummary } = args;
 
     return `
 You are a cautious skincare assistant specializing in Korean skincare routines.
@@ -141,24 +141,26 @@ ROLE + STYLE:
 - If the photo is unclear, say so and reduce confidence, but still provide a safe minimal routine.
 
 USER CONTEXT (must be respected):
-- goals: "${prefs.goals}"
+- goals: "${userPreferences.goals}"
 - age: ${
-      typeof prefs.age === "number" ? prefs.age : "unknown"
+      typeof userPreferences.age === "number"
+        ? userPreferences.age
+        : "unknown"
     } (use age to adjust routine intensity + product selection)
 - valueFocus: "${
-      prefs.valueFocus
+      userPreferences.valueFocus
     }" (optimize for *worth it* / best value — NOT just cheapest)
 - fragranceFree: ${
-      prefs.fragranceFree
+      userPreferences.fragranceFree
     } (if true, prioritize fragrance-free; if unsure, say "may contain fragrance")
 - pregnancySafe: ${
-      prefs.pregnancySafe
+      userPreferences.pregnancySafe
     } (if true, avoid retinoids; choose safer alternatives when uncertain)
 - sensitiveMode: ${
-      prefs.sensitiveMode
+      userPreferences.sensitiveMode
     } (if true, simplify routine, fewer actives, slower ramp)
 
-${houseContext}
+${retrievalContextSummary}
 
 TASK:
 Analyze ONLY visible facial skin characteristics and produce a structured JSON report matching the exact schema below.
@@ -291,14 +293,14 @@ FINAL CHECK BEFORE YOU ANSWER:
 
     const { imageBase64, mimeType, userPrefs, retrievedContext = [] } = args;
 
-    const houseContext = retrievedContext.length
+    const retrievalContextSummary = retrievedContext.length
       ? `OPTIONAL CONTEXT (do NOT quote; use only as weak prior signals):\n- ${retrievedContext
           .slice(0, 6)
           .map((x) => x.replace(/\s+/g, " ").slice(0, 180))
           .join("\n- ")}\n`
       : "";
 
-    const prefs = {
+    const userPreferences = {
       goals: userPrefs.goals || "",
       age:
         typeof (userPrefs as any).age === "number"
@@ -314,7 +316,10 @@ FINAL CHECK BEFORE YOU ANSWER:
       sensitiveMode: !!userPrefs.sensitiveMode,
     };
 
-    const prompt = this.buildSkinPrompt({ prefs, houseContext });
+    const prompt = this.buildSkinPrompt({
+      userPreferences,
+      retrievalContextSummary,
+    });
 
     const imageContent = {
       type: "image_url" as const,

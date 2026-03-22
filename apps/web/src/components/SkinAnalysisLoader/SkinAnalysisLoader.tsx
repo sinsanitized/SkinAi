@@ -1,7 +1,7 @@
 import React from "react";
-import styles from "./RoastLoader.module.css";
+import styles from "./SkinAnalysisLoader.module.css";
 
-const RoastLoader: React.FC = () => {
+const SkinAnalysisLoader: React.FC = () => {
   return (
     <div className={styles.loaderContainer}>
       <div className={styles.loader}>
@@ -14,4 +14,4 @@ const RoastLoader: React.FC = () => {
   );
 };
 
-export default RoastLoader;
+export default SkinAnalysisLoader;

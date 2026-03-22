@@ -11,21 +11,23 @@ import "./SkinResult.css";
 
 const RESULT_STORAGE_KEY = "skinai:last-result";
 
-interface LocationState {
+interface SkinResultNavigationState {
   analysis: SkinAnalysisResponse;
-  prefs: SkinAnalysisRequest;
+  analysisOptions: SkinAnalysisRequest;
   imageDataUrl?: string;
 }
 
 function SkinResult() {
   const location = useLocation();
   const navigate = useNavigate();
-  const navigationState = location.state as LocationState | undefined;
+  const navigationState = location.state as
+    | SkinResultNavigationState
+    | undefined;
   const storedState = (() => {
     const raw = sessionStorage.getItem(RESULT_STORAGE_KEY);
     if (!raw) return undefined;
     try {
-      return JSON.parse(raw) as LocationState;
+      return JSON.parse(raw) as SkinResultNavigationState;
     } catch {
       return undefined;
     }

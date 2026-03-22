@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ImageUpload } from "../components/ImageUpload/ImageUpload";
-import RoastLoader from "../components/RoastLoader/RoastLoader";
-import { apiService } from "../services/api";
+import SkinAnalysisLoader from "../components/SkinAnalysisLoader/SkinAnalysisLoader";
+import { skinAnalysisApi } from "../services/skinAnalysisApi";
 import type { SkinAnalysisRequest, ValueFocus } from "@skinai/shared-types";
 import "./Home.css";
 
@@ -21,7 +21,7 @@ function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const [prefs, setPrefs] = useState<SkinAnalysisRequest>({
+  const [analysisOptions, setAnalysisOptions] = useState<SkinAnalysisRequest>({
     goals: "",
     age: 38,
     valueFocus: "best_value",
@@ -37,14 +37,14 @@ function Home() {
     setLoading(true);
 
     try {
-      const analysis = await apiService.analyzeSkin(file, prefs);
+      const analysis = await skinAnalysisApi.analyzeSkin(file, analysisOptions);
       const imageDataUrl = await fileToDataUrl(file);
 
       sessionStorage.setItem(
         RESULT_STORAGE_KEY,
         JSON.stringify({
           analysis,
-          prefs,
+          analysisOptions,
           imageDataUrl,
         })
       );
@@ -54,7 +54,7 @@ function Home() {
       navigate("/result", {
         state: {
           analysis,
-          prefs,
+          analysisOptions,
           imageDataUrl,
         },
       });
@@ -70,7 +70,7 @@ function Home() {
       <h1 className="title">SkinAI 🧴</h1>
 
       {loading ? (
-        <RoastLoader />
+        <SkinAnalysisLoader />
       ) : (
         <>
           <ImageUpload
@@ -84,9 +84,12 @@ function Home() {
               type="text"
               className="context-input"
               placeholder='e.g. "acne + dark spots", "redness", "oil control"'
-              value={prefs.goals || ""}
+              value={analysisOptions.goals || ""}
               onChange={(e) =>
-                setPrefs((p) => ({ ...p, goals: e.target.value }))
+                setAnalysisOptions((currentOptions) => ({
+                  ...currentOptions,
+                  goals: e.target.value,
+                }))
               }
             />
           </div>
@@ -98,11 +101,15 @@ function Home() {
                 type="number"
                 min={10}
                 max={90}
-                value={typeof prefs.age === "number" ? prefs.age : ""}
+                value={
+                  typeof analysisOptions.age === "number"
+                    ? analysisOptions.age
+                    : ""
+                }
                 onChange={(e) => {
                   const n = Number(e.target.value);
-                  setPrefs((p) => ({
-                    ...p,
+                  setAnalysisOptions((currentOptions) => ({
+                    ...currentOptions,
                     age: Number.isFinite(n) ? n : undefined,
                   }));
                 }}
@@ -112,10 +119,10 @@ function Home() {
             <div className="pref">
               <label>Value focus</label>
               <select
-                value={prefs.valueFocus || "best_value"}
+                value={analysisOptions.valueFocus || "best_value"}
                 onChange={(e) =>
-                  setPrefs((p) => ({
-                    ...p,
+                  setAnalysisOptions((currentOptions) => ({
+                    ...currentOptions,
                     valueFocus: e.target.value as ValueFocus,
                   }))
                 }
@@ -131,9 +138,12 @@ function Home() {
             <label className="checkbox">
               <input
                 type="checkbox"
-                checked={!!prefs.fragranceFree}
+                checked={!!analysisOptions.fragranceFree}
                 onChange={(e) =>
-                  setPrefs((p) => ({ ...p, fragranceFree: e.target.checked }))
+                  setAnalysisOptions((currentOptions) => ({
+                    ...currentOptions,
+                    fragranceFree: e.target.checked,
+                  }))
                 }
               />
               Fragrance-free
@@ -142,9 +152,12 @@ function Home() {
             <label className="checkbox">
               <input
                 type="checkbox"
-                checked={!!prefs.pregnancySafe}
+                checked={!!analysisOptions.pregnancySafe}
                 onChange={(e) =>
-                  setPrefs((p) => ({ ...p, pregnancySafe: e.target.checked }))
+                  setAnalysisOptions((currentOptions) => ({
+                    ...currentOptions,
+                    pregnancySafe: e.target.checked,
+                  }))
                 }
               />
               Pregnancy-safe
@@ -153,9 +166,12 @@ function Home() {
             <label className="checkbox">
               <input
                 type="checkbox"
-                checked={!!prefs.sensitiveMode}
+                checked={!!analysisOptions.sensitiveMode}
                 onChange={(e) =>
-                  setPrefs((p) => ({ ...p, sensitiveMode: e.target.checked }))
+                  setAnalysisOptions((currentOptions) => ({
+                    ...currentOptions,
+                    sensitiveMode: e.target.checked,
+                  }))
                 }
               />
               Sensitive mode (extra gentle)

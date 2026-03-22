@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 
-export function validateImageUpload(
+export function validateImageUploadRequest(
   req: Request,
   res: Response,
   next: NextFunction

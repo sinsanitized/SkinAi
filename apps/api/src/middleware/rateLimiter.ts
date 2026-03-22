@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 
 // Simple in-memory rate limiter
-const requestCounts = new Map<string, { count: number; resetTime: number }>();
+const rateLimitBuckets = new Map<string, { count: number; resetTime: number }>();
 
 export function rateLimiter(
   req: Request,
@@ -13,11 +13,11 @@ export function rateLimiter(
   const limit = 10; // requests per window
   const windowMs = 60 * 1000; // 1 minute
 
-  const record = requestCounts.get(ip);
+  const record = rateLimitBuckets.get(ip);
 
   if (!record || now > record.resetTime) {
     // New window
-    requestCounts.set(ip, {
+    rateLimitBuckets.set(ip, {
       count: 1,
       resetTime: now + windowMs,
     });
@@ -40,9 +40,9 @@ export function rateLimiter(
 // Clean up old entries every 5 minutes
 setInterval(() => {
   const now = Date.now();
-  for (const [ip, record] of requestCounts.entries()) {
+  for (const [ip, record] of rateLimitBuckets.entries()) {
     if (now > record.resetTime) {
-      requestCounts.delete(ip);
+      rateLimitBuckets.delete(ip);
     };
   };
 }, 5 * 60 * 1000);

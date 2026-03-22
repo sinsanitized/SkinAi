@@ -1,7 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
 import { skinController } from "../controllers/skin.controller";
-import { validateImageUpload } from "../middleware/validation";
+import { validateImageUploadRequest } from "../middleware/imageUploadValidation";
 import { rateLimiter } from "../middleware/rateLimiter";
 
 const router = Router();
@@ -17,7 +17,7 @@ router.post(
   "/skin/analyze",
   rateLimiter,
   upload.single("image"),
-  validateImageUpload,
+  validateImageUploadRequest,
   skinController.analyzeSkin.bind(skinController)
 );
 
