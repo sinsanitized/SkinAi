@@ -1,5 +1,4 @@
-import "./loadEnv";
-console.log("OPENAI_API_KEY loaded:", !!process.env.OPENAI_API_KEY);
+import { envStatus } from "./loadEnv";
 import express from "express";
 import cors from "cors";
 import skinRoutes from "./routes/skin.routes";
@@ -8,11 +7,13 @@ import { logger } from "./utils/logger";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const environment = process.env.NODE_ENV || "development";
+const corsOrigin = process.env.CORS_ORIGIN || "http://localhost:5173";
 
 // Middleware
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN || "http://localhost:5173",
+    origin: corsOrigin,
     credentials: true,
   })
 );
@@ -46,28 +47,34 @@ app.use(errorHandler);
 // Start server
 async function startServer() {
   try {
+    const isMongoSkipped = process.env.SKIP_DB === "true";
+    const mongoStatus = isMongoSkipped ? "skipped" : "enabled";
+    const persistenceStatus = isMongoSkipped
+      ? "disabled"
+      : "enabled";
+
     if (process.env.SKIP_DB !== "true") {
       // Connect to MongoDB
       // await connectDatabase();
-      logger.success("MongoDB connected");
-    } else {
-      logger.info("Skipping MongoDB connection");
     }
 
     // Start listening
     app.listen(PORT, () => {
-      logger.success(`🚀 Server running on http://localhost:${PORT}`);
-      logger.info(`Environment: ${process.env.NODE_ENV || "development"}`);
-      logger.info(
-        `CORS enabled for: ${
-          process.env.CORS_ORIGIN || "http://localhost:5173"
-        }`
-      );
-      if (process.env.SKIP_DB === "true") {
-        logger.info(
-          "⚠️  MongoDB connection skipped. Data routes may return dummy responses."
-        );
-      }
+      const startupSummary = [
+        "SkinAI API startup",
+        `- Environment: ${environment}`,
+        `- Server: http://localhost:${PORT}`,
+        `- CORS: ${corsOrigin}`,
+        `- Env file: ${envStatus.loadedEnvPath}`,
+        `- Env fallback checked: ${envStatus.fallbackEnvPath}`,
+        `- OpenAI key: ${envStatus.hasOpenAiKey ? "present" : "missing"}`,
+        `- MongoDB: ${mongoStatus}${isMongoSkipped ? " (SKIP_DB=true)" : ""}`,
+        `- Persistence: ${persistenceStatus}${
+          isMongoSkipped ? ", analysis logs will not be stored" : ""
+        }`,
+      ].join("\n");
+
+      logger.info(startupSummary);
     });
   } catch (error: any) {
     logger.error("Failed to start server:", error.message || error);

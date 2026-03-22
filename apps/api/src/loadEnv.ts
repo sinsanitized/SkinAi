@@ -1,4 +1,5 @@
 import dotenv from "dotenv";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -12,5 +13,12 @@ const rootEnvPath = path.resolve(__dirname, "../../../.env");
 dotenv.config({ path: apiEnvPath });
 dotenv.config({ path: rootEnvPath });
 
-console.log("ENV loaded from:", apiEnvPath, "fallback:", rootEnvPath);
-console.log("OPENAI_API_KEY exists?", !!process.env.OPENAI_API_KEY);
+export const envStatus = {
+  loadedEnvPath: fs.existsSync(apiEnvPath)
+    ? apiEnvPath
+    : fs.existsSync(rootEnvPath)
+    ? rootEnvPath
+    : "not found",
+  fallbackEnvPath: rootEnvPath,
+  hasOpenAiKey: Boolean(process.env.OPENAI_API_KEY),
+};
