@@ -260,25 +260,37 @@ export const ImageUpload: React.FC<Props> = ({
             </div>
           </div>
 
-          {/* Buttons UNDER the box */}
           <div
             style={{
-              marginTop: "1rem",
-              display: "flex",
+              width: "100%",
+              maxWidth: 520,
+              display: "grid",
               gap: "0.75rem",
-              justifyContent: "center",
-              flexWrap: "wrap",
             }}
           >
-            <button type="button" onClick={openMobileCamera}>
-              Take Photo (Mobile)
-            </button>
-            <button type="button" onClick={openLibrary}>
+            <button
+              type="button"
+              onClick={openLibrary}
+              style={{ width: "100%" }}
+            >
               Choose Photo
             </button>
-            <button type="button" onClick={startWebcam}>
-              Use Webcam (Desktop)
-            </button>
+
+            <div
+              style={{
+                display: "flex",
+                gap: "0.75rem",
+                justifyContent: "center",
+                flexWrap: "wrap",
+              }}
+            >
+              <button type="button" onClick={openMobileCamera}>
+                Take Photo (Mobile)
+              </button>
+              <button type="button" onClick={startWebcam}>
+                Use Webcam (Desktop)
+              </button>
+            </div>
           </div>
 
           {webcamError && (
