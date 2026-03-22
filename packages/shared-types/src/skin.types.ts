@@ -69,8 +69,12 @@ export interface IngredientConflict {
 }
 
 export interface SkinEducation {
+  // Plain-language summary for the user-facing explanation panel.
   skinTypeExplanation: string;
+  // Maps recommendations back to expected outcomes so the UI can justify why
+  // the routine is worth following.
   productBenefits: string[];
+  // Ordered guidance for layering products without relying on free-form prose.
   layeringGuide: string[];
 }
 
@@ -102,6 +106,7 @@ export interface SkinAnalysisRequest {
 
 export interface SkinAnalysisResponse {
   skinType: SkinTypeResult;
+  // Human-readable teaching layer rendered in the frontend alongside the JSON.
   explanation: SkinEducation;
   concerns: SkinConcern[];
   ingredients: IngredientRecommendation[];

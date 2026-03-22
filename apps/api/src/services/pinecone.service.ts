@@ -19,6 +19,8 @@ export class PineconeService {
   }
 
   private getIndex(): Index<SkinMetadata> | null {
+    // Lazy initialization keeps the API usable in local/dev environments where
+    // retrieval is optional, while still enabling RAG in production deployments.
     if (!this.isEnabled()) return null;
     if (this.index) return this.index;
 
@@ -38,6 +40,8 @@ export class PineconeService {
     if (!index) return [];
 
     try {
+      // Retrieval adds prior structured examples to the prompt so the model is
+      // grounded in previous analyses instead of generating from image + prompt alone.
       const queryResponse = await index.query({
         vector: embedding,
         topK: PINECONE_CONFIG.topK,
@@ -64,6 +68,8 @@ export class PineconeService {
     if (!index) return;
 
     try {
+      // Persisting summaries back into Pinecone lets the system bootstrap a
+      // lightweight retrieval corpus without needing a separate ingestion job.
       await index.upsert([
         {
           id,

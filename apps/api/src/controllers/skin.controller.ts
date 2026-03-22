@@ -79,6 +79,8 @@ export class SkinController {
       // 2) Embedding for optional retrieval / progress tracking
       let embedding: number[] = [];
       try {
+        // Image-to-text-to-embedding gives the retrieval layer a compact,
+        // searchable representation instead of indexing raw pixels.
         embedding = await openAIService.generateImageEmbedding(
           base64Image,
           mimeType
@@ -91,6 +93,8 @@ export class SkinController {
       // 3) Optional: retrieve similar prior analyses / products (best-effort)
       let retrievedContext: string[] = [];
       if (embedding.length) {
+        // Retrieval is additive rather than required. If Pinecone is empty or
+        // unavailable, the core analysis path still succeeds.
         retrievedContext = await pineconeService.searchSimilarContext(
           embedding
         );
@@ -116,6 +120,8 @@ export class SkinController {
       // 5) Store in MongoDB (optional)
       if (process.env.SKIP_DB !== "true") {
         try {
+          // MongoDB acts as the system-of-record for observability: inputs,
+          // latency, and outputs can be audited without relying on Pinecone.
           await SkinAnalysisLogModel.create({
             imageEmbedding: embedding,
             analysis,

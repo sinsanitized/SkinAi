@@ -82,6 +82,8 @@ const EMBEDDING_CONFIG = {
 } as const;
 
 export class OpenAIService {
+  // Normalize the model payload before any downstream checks so the API can
+  // return a stable shape even when the model omits optional fields.
   private normalizeAnalysisResponse(
     json: SkinAnalysisResponse
   ): SkinAnalysisResponse {
@@ -131,6 +133,9 @@ export class OpenAIService {
       sensitiveMode: boolean;
     }
   ): SkinAnalysisResponse {
+    // This is the reliability layer: instead of failing the request after one
+    // imperfect model pass, we remove or rewrite obviously unsafe content so
+    // the user still gets a structured response.
     const sanitized = this.normalizeAnalysisResponse(json);
 
     if (prefs.fragranceFree) {
@@ -323,6 +328,9 @@ If something is not clearly visible, explicitly say that.
   }): string {
     const { userPreferences, retrievalContextSummary } = args;
 
+    // The prompt is intentionally opinionated: visible findings remain primary,
+    // while user-provided preferences steer recommendations when they do not
+    // conflict with safety constraints or what the image actually shows.
     return `
 You are a cautious skincare assistant specializing in Korean skincare routines.
 
@@ -588,7 +596,8 @@ FINAL CHECK BEFORE YOU ANSWER:
     const text1 = response1.choices?.[0]?.message?.content || "";
     let json = extractJSON<SkinAnalysisResponse>(text1);
 
-    // If parse failed, retry once focusing on strict JSON output.
+    // Retry only when the first response is not valid JSON. Quality misses no
+    // longer trigger another expensive generation pass.
     if (!json) {
       const responseFix = await openai.chat.completions.create({
         model: "gpt-4o-mini",
@@ -630,6 +639,9 @@ FINAL CHECK BEFORE YOU ANSWER:
         err
       );
 
+      // Preference repair is cheaper and more predictable than asking the model
+      // for another full answer, so we sanitize in-process and annotate the
+      // result with disclaimers for transparency.
       const fallback = this.sanitizeForPreferences(json, userPreferences);
       fallback.disclaimers = [
         ...fallback.disclaimers,
