@@ -1,7 +1,8 @@
 import type {
-  SkinAnalysisResponse,
   ApiResponse,
   SkinAnalysisRequest,
+  SkinAnalysisResponse,
+  ValueFocus,
 } from "@skinai/shared-types";
 
 // In dev, use Vite proxy by default (same-origin).
@@ -18,13 +19,13 @@ export class ApiService {
 
     if (prefs.goals) formData.append("goals", prefs.goals);
 
-    // NEW
-    if (typeof (prefs as any).age === "number")
-      formData.append("age", String((prefs as any).age));
+    if (typeof prefs.age === "number") {
+      formData.append("age", String(prefs.age));
+    }
 
-    // NEW (optional, defaults server-side too)
-    if ((prefs as any).valueFocus)
-      formData.append("valueFocus", String((prefs as any).valueFocus));
+    if (prefs.valueFocus) {
+      formData.append("valueFocus", prefs.valueFocus satisfies ValueFocus);
+    }
 
     if (typeof prefs.fragranceFree === "boolean")
       formData.append("fragranceFree", String(prefs.fragranceFree));

@@ -1,21 +1,19 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ImageUpload } from "../components/ImageUpload/ImageUpload";
 import RoastLoader from "../components/RoastLoader/RoastLoader";
 import { apiService } from "../services/api";
-import type { SkinAnalysisRequest } from "@skinai/shared-types";
+import type { SkinAnalysisRequest, ValueFocus } from "@skinai/shared-types";
 import "./Home.css";
 
-const Home: React.FC = () => {
+function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
 
   const [prefs, setPrefs] = useState<SkinAnalysisRequest>({
     goals: "",
-    // NEW
-    age: 38 as any, // you can set undefined by default if you prefer
-    valueFocus: "best_value" as any,
-
+    age: 38,
+    valueFocus: "best_value",
     fragranceFree: false,
     pregnancySafe: false,
     sensitiveMode: false,
@@ -75,16 +73,12 @@ const Home: React.FC = () => {
                 type="number"
                 min={10}
                 max={90}
-                value={
-                  typeof (prefs as any).age === "number"
-                    ? (prefs as any).age
-                    : ""
-                }
+                value={typeof prefs.age === "number" ? prefs.age : ""}
                 onChange={(e) => {
                   const n = Number(e.target.value);
                   setPrefs((p) => ({
                     ...p,
-                    age: Number.isFinite(n) ? (n as any) : (undefined as any),
+                    age: Number.isFinite(n) ? n : undefined,
                   }));
                 }}
               />
@@ -93,9 +87,12 @@ const Home: React.FC = () => {
             <div className="pref">
               <label>Value focus</label>
               <select
-                value={(prefs as any).valueFocus || "best_value"}
+                value={prefs.valueFocus || "best_value"}
                 onChange={(e) =>
-                  setPrefs((p) => ({ ...p, valueFocus: e.target.value as any }))
+                  setPrefs((p) => ({
+                    ...p,
+                    valueFocus: e.target.value as ValueFocus,
+                  }))
                 }
               >
                 <option value="best_value">Best value (worth it)</option>
@@ -147,6 +144,6 @@ const Home: React.FC = () => {
       )}
     </div>
   );
-};
+}
 
 export default Home;

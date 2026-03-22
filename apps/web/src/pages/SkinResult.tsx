@@ -1,6 +1,12 @@
-import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import type { SkinAnalysisResponse, SkinAnalysisRequest } from "@skinai/shared-types";
+import type {
+  IngredientConflict,
+  IngredientRecommendation,
+  ProductRecommendation,
+  SkinAnalysisRequest,
+  SkinAnalysisResponse,
+  SkinConcern,
+} from "@skinai/shared-types";
 import "./SkinResult.css";
 
 interface LocationState {
@@ -9,7 +15,7 @@ interface LocationState {
   prefs: SkinAnalysisRequest;
 }
 
-const SkinResult: React.FC = () => {
+function SkinResult() {
   const location = useLocation();
   const navigate = useNavigate();
   const state = location.state as LocationState | undefined;
@@ -39,7 +45,7 @@ const SkinResult: React.FC = () => {
 
           <h2>Top Concerns</h2>
           <div className="concerns">
-            {analysis.concerns?.slice(0, 6).map((c, idx) => (
+            {analysis.concerns?.slice(0, 6).map((c: SkinConcern, idx: number) => (
               <div key={idx} className="concern">
                 <div className="concernName">{c.name}</div>
                 <div className="concernMeta">
@@ -58,7 +64,7 @@ const SkinResult: React.FC = () => {
           <div className="routineBlock">
             <h3>AM</h3>
             <ol>
-              {analysis.routine?.AM?.map((s, i) => (
+              {analysis.routine?.AM?.map((s: string, i: number) => (
                 <li key={i}>{s}</li>
               ))}
             </ol>
@@ -66,7 +72,7 @@ const SkinResult: React.FC = () => {
           <div className="routineBlock">
             <h3>PM</h3>
             <ol>
-              {analysis.routine?.PM?.map((s, i) => (
+              {analysis.routine?.PM?.map((s: string, i: number) => (
                 <li key={i}>{s}</li>
               ))}
             </ol>
@@ -75,7 +81,7 @@ const SkinResult: React.FC = () => {
             <div className="routineBlock">
               <h3>Weekly</h3>
               <ul>
-                {analysis.routine.weekly.map((s, i) => (
+                {analysis.routine.weekly.map((s: string, i: number) => (
                   <li key={i}>{s}</li>
                 ))}
               </ul>
@@ -86,7 +92,7 @@ const SkinResult: React.FC = () => {
         <div className="card">
           <h2>Ingredients</h2>
           <ul className="list">
-            {analysis.ingredients?.map((ing, i) => (
+            {analysis.ingredients?.map((ing: IngredientRecommendation, i: number) => (
               <li key={i}>
                 <div className="itemTitle">{ing.ingredient}</div>
                 <div className="itemBody">{ing.reason}</div>
@@ -101,7 +107,7 @@ const SkinResult: React.FC = () => {
         <div className="card">
           <h2>Product Picks</h2>
           <ul className="list">
-            {analysis.products?.slice(0, 10).map((p, i) => (
+            {analysis.products?.slice(0, 10).map((p: ProductRecommendation, i: number) => (
               <li key={i}>
                 <div className="itemTitle">
                   {p.brand ? `${p.brand} — ` : ""}{p.name}
@@ -121,7 +127,7 @@ const SkinResult: React.FC = () => {
           <h2>Conflicts & Warnings</h2>
           {analysis.conflicts?.length ? (
             <ul className="list">
-              {analysis.conflicts.map((c, i) => (
+              {analysis.conflicts.map((c: IngredientConflict, i: number) => (
                 <li key={i}>
                   <div className="itemTitle">{c.ingredients.join(" + ")}</div>
                   <div className="itemBody">{c.warning}</div>
@@ -134,7 +140,7 @@ const SkinResult: React.FC = () => {
 
           <h2>Disclaimers</h2>
           <ul className="list">
-            {analysis.disclaimers?.map((d, i) => (
+            {analysis.disclaimers?.map((d: string, i: number) => (
               <li key={i} className="muted">{d}</li>
             ))}
           </ul>
@@ -146,6 +152,6 @@ const SkinResult: React.FC = () => {
       </button>
     </div>
   );
-};
+}
 
 export default SkinResult;

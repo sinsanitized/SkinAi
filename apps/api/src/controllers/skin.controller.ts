@@ -3,6 +3,8 @@ import type {
   ApiResponse,
   SkinAnalysisResponse,
   SkinAnalysisRequest,
+  SkinConcern,
+  ValueFocus,
 } from "@skinai/shared-types";
 import { openAIService } from "../services/openai.service";
 import { pineconeService } from "../services/pinecone.service";
@@ -55,7 +57,7 @@ export class SkinController {
           base64Image,
           mimeType
         );
-      } catch (e) {
+      } catch {
         // Embeddings are optional; analysis can proceed without them.
         embedding = [];
       }
@@ -72,7 +74,7 @@ export class SkinController {
       const userPrefs: SkinAnalysisRequest = {
         goals,
         age: Number.isFinite(age as number) ? (age as number) : undefined,
-        valueFocus: valueFocus as any,
+        valueFocus: valueFocus as ValueFocus,
         fragranceFree,
         pregnancySafe,
         sensitiveMode,
@@ -114,7 +116,7 @@ export class SkinController {
           `SkinType: ${analysis.skinType?.type}. Concerns: ` +
           (analysis.concerns || [])
             .slice(0, 4)
-            .map((c) => `${c.name}(${c.severity})`)
+            .map((c: SkinConcern) => `${c.name}(${c.severity})`)
             .join(", ");
 
         pineconeService

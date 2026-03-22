@@ -6,7 +6,6 @@ dotenv.config({
 console.log("OPENAI_API_KEY loaded:", !!process.env.OPENAI_API_KEY);
 import express from "express";
 import cors from "cors";
-import { connectDatabase } from "./config/database";
 import skinRoutes from "./routes/skin.routes";
 import { errorHandler } from "./middleware/errorHandler";
 import { logger } from "./utils/logger";
