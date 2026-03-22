@@ -97,6 +97,14 @@
   margin-top: 1.25rem;
 }
 
+.cardWide {
+  grid-column: 1 / -1;
+}
+
+.explanationSection + .explanationSection {
+  margin-top: 1.15rem;
+}
+
 .routineBlock + .routineBlock {
   margin-top: 1rem;
 }
@@ -114,6 +122,15 @@
 }
 
 .routineBlock li + li {
+  margin-top: 0.45rem;
+}
+
+.stackingList {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.stackingList li + li {
   margin-top: 0.45rem;
 }
 

@@ -251,6 +251,7 @@ QUALITY RULES (IMPORTANT):
 7) Conflicts must include concrete “do not combine same night” warnings relevant to ingredients you recommended.
 8) If fragranceFree=true, do not recommend any product that mentions fragrance, parfum, perfume, or essential oils.
 9) If pregnancySafe=true, do not recommend retinoids or include them in ingredients, products, routine steps, or conflicts.
+10) Include an explanation section that teaches the user what their skin type means, how the product picks improve the skin over time, and how to stack products in the correct order.
 
 EVIDENCE RULE:
 For each concern, include specific visible evidence from the photo (e.g., "clustered red papules on cheeks", "shine in T-zone", "visible post-acne marks on jaw").
@@ -260,6 +261,11 @@ Return JSON ONLY matching this exact shape:
 
 {
   "skinType": { "type": "Oily | Dry | Combination | Normal | Acne-prone | Sensitive-leaning | Oily / Acne-prone | Combination / Acne-prone", "confidence": 0 },
+  "explanation": {
+    "skinTypeExplanation": "...",
+    "productBenefits": ["...", "..."],
+    "layeringGuide": ["...", "...", "..."]
+  },
   "concerns": [{"name": "...", "severity": "Mild|Moderate|Severe", "confidence": 0, "evidence": "..."}],
   "ingredients": [{"ingredient": "...", "reason": "...", "cautions": ["..."]}],
   "products": [{"name": "...", "brand": "...", "category": "Cleanser|Toner|Essence|Serum|Moisturizer|Sunscreen|Spot treatment|Mask", "why": "...", "howToUse": "...", "cautions": ["..."], "tags": ["..."]}],
@@ -284,6 +290,7 @@ FINAL CHECK BEFORE YOU ANSWER:
 - AM length 5–7 and PM length 6–9 (unless sensitiveMode allows shorter)
 - routine.weekly includes Daily base + Active cycle + Ramp-up + Rules
 - at least 4 product slots covered
+- include explanation.skinTypeExplanation, explanation.productBenefits, and explanation.layeringGuide
 `;
   }
 
@@ -297,6 +304,8 @@ FINAL CHECK BEFORE YOU ANSWER:
     const weeklyArr = json?.routine?.weekly ?? [];
     const weeklyText = weeklyArr.join(" ").toLowerCase();
     const productsLen = (json as any)?.products?.length ?? 0;
+    const productBenefitsLen = json?.explanation?.productBenefits?.length ?? 0;
+    const layeringGuideLen = json?.explanation?.layeringGuide?.length ?? 0;
 
     if (amLen < 5 || pmLen < 6) {
       throw new Error(`Routine too short (AM=${amLen}, PM=${pmLen})`);
@@ -322,6 +331,15 @@ FINAL CHECK BEFORE YOU ANSWER:
     }
     if (productsLen < 4) {
       throw new Error("Not enough product slots covered");
+    }
+    if (!json?.explanation?.skinTypeExplanation?.trim()) {
+      throw new Error("Skin explanation missing skinTypeExplanation");
+    }
+    if (productBenefitsLen < 2) {
+      throw new Error("Skin explanation missing product benefit details");
+    }
+    if (layeringGuideLen < 3) {
+      throw new Error("Skin explanation missing layering guidance");
     }
   }
 

@@ -68,6 +68,12 @@ export interface IngredientConflict {
   warning: string;
 }
 
+export interface SkinEducation {
+  skinTypeExplanation: string;
+  productBenefits: string[];
+  layeringGuide: string[];
+}
+
 /**
  * Controls how the recommender should think about price/value.
  * - best_value: default bang-for-buck; proven actives, reliable basics
@@ -96,6 +102,7 @@ export interface SkinAnalysisRequest {
 
 export interface SkinAnalysisResponse {
   skinType: SkinTypeResult;
+  explanation: SkinEducation;
   concerns: SkinConcern[];
   ingredients: IngredientRecommendation[];
   products: ProductRecommendation[];

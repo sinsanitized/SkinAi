@@ -6,6 +6,7 @@ import type {
   SkinAnalysisRequest,
   SkinAnalysisResponse,
   SkinConcern,
+  SkinEducation,
 } from "@skinai/shared-types";
 import "./SkinResult.css";
 
@@ -40,6 +41,7 @@ function SkinResult() {
   }
 
   const { analysis, imageDataUrl } = state;
+  const explanation: SkinEducation | undefined = analysis.explanation;
 
   return (
     <main className="result-container">
@@ -82,6 +84,40 @@ function SkinResult() {
       </div>
 
       <div className="grid">
+        {explanation ? (
+          <section
+            className="card cardWide"
+            aria-labelledby="skin-explanation-heading"
+          >
+            <h2 id="skin-explanation-heading">Skin Explanation</h2>
+
+            <div className="explanationSection">
+              <h3>What your skin type means</h3>
+              <p className="itemBody">{explanation.skinTypeExplanation}</p>
+            </div>
+
+            <div className="explanationSection">
+              <h3>How the products help</h3>
+              <ul className="list">
+                {explanation.productBenefits.map((benefit: string, i: number) => (
+                  <li key={i}>
+                    <div className="itemBody">{benefit}</div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="explanationSection">
+              <h3>How to stack the routine</h3>
+              <ol className="stackingList">
+                {explanation.layeringGuide.map((step: string, i: number) => (
+                  <li key={i}>{step}</li>
+                ))}
+              </ol>
+            </div>
+          </section>
+        ) : null}
+
         <div className="card">
           <h2>Routine</h2>
           <div className="routineBlock">
