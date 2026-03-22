@@ -82,6 +82,79 @@ const EMBEDDING_CONFIG = {
 } as const;
 
 export class OpenAIService {
+  private buildSafeFallbackAnalysis(args: {
+    prefs: {
+      goals: string;
+      age?: number;
+      valueFocus: ValueFocus;
+      fragranceFree: boolean;
+      pregnancySafe: boolean;
+      sensitiveMode: boolean;
+    };
+    reason: string;
+  }): SkinAnalysisResponse {
+    const { prefs, reason } = args;
+
+    return {
+      skinType: {
+        type: "Sensitive-leaning",
+        confidence: 0.35,
+      },
+      explanation: {
+        skinTypeExplanation:
+          "The system could not confidently generate a full analysis, so this fallback response prioritizes a simple, lower-risk routine.",
+        productBenefits: [
+          "The fallback plan focuses on gentle cleansing, moisturizer, and sunscreen to reduce the chance of over-treatment.",
+          prefs.goals
+            ? `Because the model could not fully complete the request, goals such as "${prefs.goals}" should be addressed conservatively until a stronger analysis is available.`
+            : "The fallback avoids making aggressive claims about specific visible concerns.",
+        ],
+        layeringGuide: [
+          "Use cleanser first, then treatment only if specifically tolerated, then moisturizer.",
+          "Keep the routine simple until a higher-confidence analysis is available.",
+          "Finish every morning with sunscreen as the final layer.",
+        ],
+      },
+      concerns: [],
+      ingredients: [
+        {
+          ingredient: "Ceramides",
+          reason: "Barrier-supportive default when analysis confidence is limited.",
+          cautions: [],
+        },
+        {
+          ingredient: "Glycerin",
+          reason: "Supports hydration without forcing a strong active recommendation.",
+          cautions: [],
+        },
+      ],
+      products: [],
+      routine: {
+        AM: [
+          "Cleanser - daily - use a gentle cleanser if needed",
+          "Moisturizer - daily - apply to damp skin if skin feels dry",
+          "Sunscreen - daily - final morning step",
+        ],
+        PM: [
+          "Cleanser - daily - remove sunscreen and surface debris",
+          "Moisturizer - daily - use a barrier-supportive cream",
+        ],
+        weekly: [
+          "Daily base (AM): gentle cleanse, moisturize if needed, sunscreen",
+          "Daily base (PM): cleanse, moisturize, avoid unnecessary actives",
+          "Rules: keep the routine simple and patch test any new product until a more confident analysis is available",
+        ],
+      },
+      conflicts: [],
+      disclaimers: [
+        "This fallback response was returned because the model pipeline could not produce a fully reliable structured analysis.",
+        `Fallback reason: ${reason}`,
+        "This is not medical advice.",
+      ],
+      timestamp: new Date().toISOString(),
+    };
+  }
+
   // Normalize the model payload before any downstream checks so the API can
   // return a stable shape even when the model omits optional fields.
   private normalizeAnalysisResponse(
@@ -120,6 +193,42 @@ export class OpenAIService {
       conflicts: json.conflicts ?? [],
       disclaimers: json.disclaimers ?? [],
       timestamp: json.timestamp || new Date().toISOString(),
+    };
+  }
+
+  private validateAnalysisShape(json: SkinAnalysisResponse): {
+    success: boolean;
+    errors: string[];
+  } {
+    const errors: string[] = [];
+
+    if (!json.skinType?.type) errors.push("Missing skinType.type");
+    if (typeof json.skinType?.confidence !== "number") {
+      errors.push("Missing skinType.confidence");
+    }
+    if (!Array.isArray(json.concerns)) errors.push("Missing concerns array");
+    if (!Array.isArray(json.ingredients))
+      errors.push("Missing ingredients array");
+    if (!Array.isArray(json.products)) errors.push("Missing products array");
+    if (!Array.isArray(json.routine?.AM)) errors.push("Missing routine.AM");
+    if (!Array.isArray(json.routine?.PM)) errors.push("Missing routine.PM");
+    if (!Array.isArray(json.conflicts)) errors.push("Missing conflicts array");
+    if (!Array.isArray(json.disclaimers)) {
+      errors.push("Missing disclaimers array");
+    }
+    if (!json.explanation?.skinTypeExplanation) {
+      errors.push("Missing explanation.skinTypeExplanation");
+    }
+    if (!Array.isArray(json.explanation?.productBenefits)) {
+      errors.push("Missing explanation.productBenefits");
+    }
+    if (!Array.isArray(json.explanation?.layeringGuide)) {
+      errors.push("Missing explanation.layeringGuide");
+    }
+
+    return {
+      success: errors.length === 0,
+      errors,
     };
   }
 
@@ -549,8 +658,6 @@ FINAL CHECK BEFORE YOU ANSWER:
     userPrefs: SkinAnalysisRequest;
     retrievedContext?: string[];
   }): Promise<SkinAnalysisResponse> {
-    const openai = getOpenAIClient();
-
     const { imageBase64, mimeType, userPrefs, retrievedContext = [] } = args;
 
     const retrievalContextSummary = retrievedContext.length
@@ -585,49 +692,65 @@ FINAL CHECK BEFORE YOU ANSWER:
       content: [{ type: "text" as const, text: prompt }, imageContent],
     };
 
-    // First attempt
-    const response1 = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [userMessage],
-      temperature: 0.4,
-      max_tokens: 1600,
-    });
+    try {
+      const openai = getOpenAIClient();
 
-    const text1 = response1.choices?.[0]?.message?.content || "";
-    let json = extractJSON<SkinAnalysisResponse>(text1);
-
-    // Retry only when the first response is not valid JSON. Quality misses no
-    // longer trigger another expensive generation pass.
-    if (!json) {
-      const responseFix = await openai.chat.completions.create({
+      const response1 = await openai.chat.completions.create({
         model: "gpt-4o-mini",
-        messages: [
-          userMessage,
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: "Your last output was not valid JSON. Return ONLY valid JSON matching the schema exactly. No markdown. No extra keys.",
-              },
-            ],
-          },
-        ],
-        temperature: 0.2,
+        messages: [userMessage],
+        temperature: 0.4,
         max_tokens: 1600,
       });
 
-      const textFix = responseFix.choices?.[0]?.message?.content || "";
-      json = extractJSON<SkinAnalysisResponse>(textFix);
-    }
+      const text1 = response1.choices?.[0]?.message?.content || "";
+      let json = extractJSON<SkinAnalysisResponse>(text1);
 
-    if (!json) throw new Error("Model returned unparseable JSON");
+      if (!json) {
+        const responseFix = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            userMessage,
+            {
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: "Your last output was not valid JSON. Return ONLY valid JSON matching the schema exactly. No markdown. No extra keys.",
+                },
+              ],
+            },
+          ],
+          temperature: 0.2,
+          max_tokens: 1600,
+        });
 
-    json = this.normalizeAnalysisResponse(json);
+        const textFix = responseFix.choices?.[0]?.message?.content || "";
+        json = extractJSON<SkinAnalysisResponse>(textFix);
+      }
 
-    const qualityWarnings = this.getQualityWarnings(json);
+      if (!json) {
+        return this.buildSafeFallbackAnalysis({
+          prefs: userPreferences,
+          reason: "Model returned malformed JSON after one repair attempt",
+        });
+      }
 
-    try {
+      json = this.normalizeAnalysisResponse(json);
+
+      const shapeValidation = this.validateAnalysisShape(json);
+      if (!shapeValidation.success) {
+        console.warn(
+          "Skin analysis schema validation failed. Returning fallback:",
+          shapeValidation.errors
+        );
+        return this.buildSafeFallbackAnalysis({
+          prefs: userPreferences,
+          reason: `Schema validation failed: ${shapeValidation.errors.join(", ")}`,
+        });
+      }
+
+      const qualityWarnings = this.getQualityWarnings(json);
+
       this.assertPreferenceCompliance(json, userPreferences);
       if (qualityWarnings.length) {
         json.disclaimers = [...json.disclaimers, ...qualityWarnings];
@@ -639,16 +762,23 @@ FINAL CHECK BEFORE YOU ANSWER:
         err
       );
 
-      // Preference repair is cheaper and more predictable than asking the model
-      // for another full answer, so we sanitize in-process and annotate the
-      // result with disclaimers for transparency.
-      const fallback = this.sanitizeForPreferences(json, userPreferences);
-      fallback.disclaimers = [
-        ...fallback.disclaimers,
-        ...qualityWarnings,
-        "Some recommendations were auto-adjusted because the model response did not fully satisfy the requested safety rules.",
-      ];
-      return fallback;
+      if (err instanceof Error) {
+        const rawFallback = this.buildSafeFallbackAnalysis({
+          prefs: userPreferences,
+          reason: err.message,
+        });
+        const fallback = this.sanitizeForPreferences(rawFallback, userPreferences);
+        fallback.disclaimers = [
+          ...fallback.disclaimers,
+          "Some recommendations were auto-adjusted because the model response did not fully satisfy the requested safety rules.",
+        ];
+        return fallback;
+      }
+
+      return this.buildSafeFallbackAnalysis({
+        prefs: userPreferences,
+        reason: "Unexpected model pipeline error",
+      });
     }
   }
 }

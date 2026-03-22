@@ -9,6 +9,7 @@ interface SkinMetadata extends RecordMetadata {
 
 export class PineconeService {
   private index: Index<SkinMetadata> | null = null;
+  private readonly MIN_RETRIEVAL_SCORE = 0.2;
 
   private isEnabled(): boolean {
     // Optional kill switch for dev:
@@ -48,11 +49,29 @@ export class PineconeService {
         includeMetadata: true,
       });
 
-      return (
+      const summaries =
         queryResponse.matches
-          ?.filter((m) => (m.metadata as any)?.summary)
-          .map((m) => (m.metadata as any).summary as string) || []
-      );
+          ?.filter((match) => {
+            const summary = (match.metadata as any)?.summary as
+              | string
+              | undefined;
+            const score = match.score ?? 0;
+
+            return (
+              Boolean(summary?.trim()) &&
+              summary!.trim().length > 24 &&
+              score >= this.MIN_RETRIEVAL_SCORE
+            );
+          })
+          .map((match) => (match.metadata as any).summary as string) || [];
+
+      if (!summaries.length) {
+        console.info(
+          "Pinecone returned no relevant retrieval context. Proceeding without RAG context."
+        );
+      }
+
+      return summaries;
     } catch (error) {
       console.warn("Pinecone query failed:", error);
       return [];
