@@ -9,24 +9,35 @@ import type {
 } from "@skinai/shared-types";
 import "./SkinResult.css";
 
+const RESULT_STORAGE_KEY = "skinai:last-result";
+
 interface LocationState {
-  file: File;
   analysis: SkinAnalysisResponse;
   prefs: SkinAnalysisRequest;
+  imageDataUrl?: string;
 }
 
 function SkinResult() {
   const location = useLocation();
   const navigate = useNavigate();
-  const state = location.state as LocationState | undefined;
+  const navigationState = location.state as LocationState | undefined;
+  const storedState = (() => {
+    const raw = sessionStorage.getItem(RESULT_STORAGE_KEY);
+    if (!raw) return undefined;
+    try {
+      return JSON.parse(raw) as LocationState;
+    } catch {
+      return undefined;
+    }
+  })();
+  const state = navigationState ?? storedState;
 
   if (!state) {
     navigate("/");
     return null;
   }
 
-  const { file, analysis } = state;
-  const imageUrl = URL.createObjectURL(file);
+  const { analysis, imageDataUrl } = state;
 
   return (
     <div className="result-container">
@@ -34,7 +45,11 @@ function SkinResult() {
 
       <div className="topRow">
         <div className="photoCard">
-          <img src={imageUrl} alt="uploaded face" className="photo" />
+          {imageDataUrl ? (
+            <img src={imageDataUrl} alt="uploaded face" className="photo" />
+          ) : (
+            <div className="muted">Original photo preview unavailable.</div>
+          )}
         </div>
 
         <div className="summaryCard">

@@ -96,7 +96,7 @@ export class SkinController {
             retrievedContext,
             metadata: {
               model: "gpt-4o-mini",
-              processingTime: Date.now() - startTime,
+              processingTimeMs: Date.now() - startTime,
               goals,
               age: Number.isFinite(age as number) ? (age as number) : undefined,
               valueFocus,

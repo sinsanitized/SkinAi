@@ -6,6 +6,17 @@ import { apiService } from "../services/api";
 import type { SkinAnalysisRequest, ValueFocus } from "@skinai/shared-types";
 import "./Home.css";
 
+const RESULT_STORAGE_KEY = "skinai:last-result";
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Failed to read selected image"));
+    reader.readAsDataURL(file);
+  });
+}
+
 function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -27,13 +38,24 @@ function Home() {
 
     try {
       const analysis = await apiService.analyzeSkin(file, prefs);
+      const imageDataUrl = await fileToDataUrl(file);
+
+      sessionStorage.setItem(
+        RESULT_STORAGE_KEY,
+        JSON.stringify({
+          analysis,
+          prefs,
+          imageDataUrl,
+        })
+      );
+
       setLoading(false);
 
       navigate("/result", {
         state: {
-          file,
           analysis,
           prefs,
+          imageDataUrl,
         },
       });
     } catch (err: any) {
@@ -51,7 +73,10 @@ function Home() {
         <RoastLoader />
       ) : (
         <>
-          <ImageUpload onImagesSelected={(files) => setFile(files[0])} />
+          <ImageUpload
+            onImagesSelected={(files) => setFile(files[0] ?? null)}
+            onRemove={() => setFile(null)}
+          />
 
           <div className="context-box">
             <label className="context-label">Goals (optional)</label>

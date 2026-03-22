@@ -1,8 +1,4 @@
-import dotenv from "dotenv";
-// Load environment variables
-dotenv.config({
-  path: new URL("../../../.env", import.meta.url),
-});
+import "./loadEnv";
 console.log("OPENAI_API_KEY loaded:", !!process.env.OPENAI_API_KEY);
 import express from "express";
 import cors from "cors";

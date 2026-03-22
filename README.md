@@ -47,6 +47,8 @@ PINECONE_API_KEY=...
 PINECONE_INDEX_NAME=...
 ```
 
+The API loads `apps/api/.env` first and falls back to the repo-root `.env` if present.
+
 ### Run
 
 ```bash
