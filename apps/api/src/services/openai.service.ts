@@ -442,11 +442,8 @@ FINAL CHECK BEFORE YOU ANSWER:
 `;
   }
 
-  /**
-   * Validates whether the model response is "rich enough" to avoid lackluster routines.
-   * Throws to trigger a retry.
-   */
-  private assertRichEnough(json: SkinAnalysisResponse): void {
+  private getQualityWarnings(json: SkinAnalysisResponse): string[] {
+    const warnings: string[] = [];
     const amLen = json?.routine?.AM?.length ?? 0;
     const pmLen = json?.routine?.PM?.length ?? 0;
     const weeklyArr = json?.routine?.weekly ?? [];
@@ -456,39 +453,40 @@ FINAL CHECK BEFORE YOU ANSWER:
     const layeringGuideLen = json?.explanation?.layeringGuide?.length ?? 0;
 
     if (amLen < 5 || pmLen < 6) {
-      throw new Error(`Routine too short (AM=${amLen}, PM=${pmLen})`);
+      warnings.push(`Routine is shorter than target (AM=${amLen}, PM=${pmLen}).`);
     }
     if ((weeklyArr?.length ?? 0) < 3) {
-      throw new Error("Weekly plan missing/too short");
+      warnings.push("Weekly plan is lighter than target.");
     }
-    // Require daily base + active cycle to exist (enforced by prefixes)
     if (
       !weeklyText.includes("daily base (am)") ||
       !weeklyText.includes("daily base (pm)")
     ) {
-      throw new Error("Weekly plan missing Daily base (AM/PM)");
+      warnings.push("Weekly plan is missing a complete daily base explanation.");
     }
     if (!weeklyText.includes("active cycle")) {
-      throw new Error("Weekly plan missing Active cycle");
+      warnings.push("Weekly plan is missing a detailed active cycle.");
     }
     if (!weeklyText.includes("ramp-up") && !weeklyText.includes("ramp up")) {
-      throw new Error("Weekly plan missing Ramp-up");
+      warnings.push("Weekly plan is missing a ramp-up schedule.");
     }
     if (!weeklyText.includes("rules:")) {
-      throw new Error("Weekly plan missing Rules");
+      warnings.push("Weekly plan is missing pause or irritation rules.");
     }
     if (productsLen < 4) {
-      throw new Error("Not enough product slots covered");
+      warnings.push("Product coverage is narrower than target.");
     }
     if (!json?.explanation?.skinTypeExplanation?.trim()) {
-      throw new Error("Skin explanation missing skinTypeExplanation");
+      warnings.push("Skin explanation is missing skin type context.");
     }
     if (productBenefitsLen < 2) {
-      throw new Error("Skin explanation missing product benefit details");
+      warnings.push("Skin explanation is missing product benefit detail.");
     }
     if (layeringGuideLen < 3) {
-      throw new Error("Skin explanation missing layering guidance");
+      warnings.push("Skin explanation is missing full layering guidance.");
     }
+
+    return warnings;
   }
 
   private assertPreferenceCompliance(
@@ -618,64 +616,27 @@ FINAL CHECK BEFORE YOU ANSWER:
 
     json = this.normalizeAnalysisResponse(json);
 
-    // Richness and compliance check: retry once if the model response is incomplete.
+    const qualityWarnings = this.getQualityWarnings(json);
+
     try {
-      this.assertRichEnough(json);
       this.assertPreferenceCompliance(json, userPreferences);
+      if (qualityWarnings.length) {
+        json.disclaimers = [...json.disclaimers, ...qualityWarnings];
+      }
       return json;
     } catch (err) {
-      console.warn("Initial skin analysis failed validation. Retrying once:", err);
+      console.warn(
+        "Skin analysis failed preference validation. Returning sanitized fallback:",
+        err
+      );
 
-      const response2 = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          userMessage,
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: "Your last output did not satisfy the requirements. Expand with specific step frequencies and conditions, ensure routine.weekly includes Daily base (AM), Daily base (PM), Active cycle (Mon-Sun), Ramp-up (4 weeks), and Rules, and strictly obey all user preferences. If fragranceFree=true, include only fragrance-free products. If pregnancySafe=true, do not mention or recommend retinoids anywhere. Follow the worth it / best value rule. Return valid JSON only.",
-              },
-            ],
-          },
-        ],
-        temperature: 0.35,
-        max_tokens: 1800,
-      });
-
-      const text2 = response2.choices?.[0]?.message?.content || "";
-      const json2 = extractJSON<SkinAnalysisResponse>(text2);
-
-      if (!json2) {
-        const fallback = this.sanitizeForPreferences(json, userPreferences);
-        fallback.disclaimers = [
-          ...fallback.disclaimers,
-          "The model retry did not return valid JSON, so a partial result was returned.",
-        ];
-        return fallback;
-      }
-
-      const normalizedRetry = this.normalizeAnalysisResponse(json2);
-
-      // Prefer a compliant retry, but return a sanitized fallback instead of failing the request.
-      try {
-        this.assertRichEnough(normalizedRetry);
-        this.assertPreferenceCompliance(normalizedRetry, userPreferences);
-        return normalizedRetry;
-      } catch (retryErr) {
-        console.warn(
-          "Retry skin analysis failed validation. Returning sanitized fallback:",
-          retryErr
-        );
-
-        const fallback = this.sanitizeForPreferences(normalizedRetry, userPreferences);
-        fallback.disclaimers = [
-          ...fallback.disclaimers,
-          "Some recommendations were auto-adjusted because the model response did not fully satisfy the requested safety or formatting rules.",
-        ];
-        return fallback;
-      }
+      const fallback = this.sanitizeForPreferences(json, userPreferences);
+      fallback.disclaimers = [
+        ...fallback.disclaimers,
+        ...qualityWarnings,
+        "Some recommendations were auto-adjusted because the model response did not fully satisfy the requested safety rules.",
+      ];
+      return fallback;
     }
   }
 }
