@@ -2,7 +2,51 @@ import { getOpenAIClient } from "../config/openai";
 import type {
   SkinAnalysisResponse,
   SkinAnalysisRequest,
+  ValueFocus,
 } from "@skinai/shared-types";
+
+const PREGNANCY_UNSAFE_TERMS = [
+  "retinoid",
+  "retinol",
+  "retinal",
+  "retinaldehyde",
+  "tretinoin",
+  "adapalene",
+  "tazarotene",
+  "trifarotene",
+] as const;
+
+const FRAGRANCE_TERMS = [
+  "fragrance",
+  "parfum",
+  "perfume",
+  "essential oil",
+  "fragrant oil",
+] as const;
+
+const VALID_VALUE_FOCUS = new Set<ValueFocus>([
+  "best_value",
+  "midrange_worth_it",
+  "splurge_if_unique",
+]);
+
+function containsAnyTerm(text: string, terms: readonly string[]): boolean {
+  const normalized = text.toLowerCase();
+  return terms.some((term) => normalized.includes(term));
+}
+
+function stringifyForComplianceCheck(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) {
+    return value.map((item) => stringifyForComplianceCheck(item)).join(" ");
+  }
+  if (value && typeof value === "object") {
+    return Object.values(value)
+      .map((item) => stringifyForComplianceCheck(item))
+      .join(" ");
+  }
+  return "";
+}
 
 /**
  * Helper function to safely extract JSON from LLM responses.
@@ -152,7 +196,7 @@ USER CONTEXT (must be respected):
     }" (optimize for *worth it* / best value — NOT just cheapest)
 - fragranceFree: ${
       userPreferences.fragranceFree
-    } (if true, prioritize fragrance-free; if unsure, say "may contain fragrance")
+    } (if true, recommend only fragrance-free products and avoid parfum, fragrance, and essential oils; do not include products with unknown fragrance status)
 - pregnancySafe: ${
       userPreferences.pregnancySafe
     } (if true, avoid retinoids; choose safer alternatives when uncertain)
@@ -205,6 +249,8 @@ QUALITY RULES (IMPORTANT):
    Optional: spot treatment / mask
 6) Do not invent brands. Prefer widely available K-beauty brands. If uncertain, choose safe mainstream options.
 7) Conflicts must include concrete “do not combine same night” warnings relevant to ingredients you recommended.
+8) If fragranceFree=true, do not recommend any product that mentions fragrance, parfum, perfume, or essential oils.
+9) If pregnancySafe=true, do not recommend retinoids or include them in ingredients, products, routine steps, or conflicts.
 
 EVIDENCE RULE:
 For each concern, include specific visible evidence from the photo (e.g., "clustered red papules on cheeks", "shine in T-zone", "visible post-acne marks on jaw").
@@ -279,6 +325,48 @@ FINAL CHECK BEFORE YOU ANSWER:
     }
   }
 
+  private assertPreferenceCompliance(
+    json: SkinAnalysisResponse,
+    prefs: {
+      age?: number;
+      valueFocus: ValueFocus;
+      fragranceFree: boolean;
+      pregnancySafe: boolean;
+      sensitiveMode: boolean;
+    }
+  ): void {
+    if (
+      typeof prefs.age === "number" &&
+      (!Number.isInteger(prefs.age) || prefs.age < 10 || prefs.age > 90)
+    ) {
+      throw new Error(`Invalid age preference: ${prefs.age}`);
+    }
+
+    if (!VALID_VALUE_FOCUS.has(prefs.valueFocus)) {
+      throw new Error(`Invalid valueFocus preference: ${prefs.valueFocus}`);
+    }
+
+    const analysisText = stringifyForComplianceCheck(json);
+
+    if (
+      prefs.pregnancySafe &&
+      containsAnyTerm(analysisText, PREGNANCY_UNSAFE_TERMS)
+    ) {
+      throw new Error(
+        "Pregnancy-safe mode violated by retinoid-related recommendation"
+      );
+    }
+
+    if (prefs.fragranceFree) {
+      const productText = stringifyForComplianceCheck(json.products);
+      if (containsAnyTerm(productText, FRAGRANCE_TERMS)) {
+        throw new Error(
+          "Fragrance-free mode violated by fragrance-related product recommendation"
+        );
+      }
+    }
+  }
+
   /**
    * Main: generate structured skin analysis response for UI.
    * Includes one retry if output is short/generic or JSON parsing fails.
@@ -302,15 +390,9 @@ FINAL CHECK BEFORE YOU ANSWER:
 
     const userPreferences = {
       goals: userPrefs.goals || "",
-      age:
-        typeof (userPrefs as any).age === "number"
-          ? (userPrefs as any).age
-          : undefined,
+      age: typeof userPrefs.age === "number" ? userPrefs.age : undefined,
       valueFocus:
-        ((userPrefs as any).valueFocus as
-          | "best_value"
-          | "midrange_worth_it"
-          | "splurge_if_unique") || "best_value",
+        userPrefs.valueFocus || "best_value",
       fragranceFree: !!userPrefs.fragranceFree,
       pregnancySafe: !!userPrefs.pregnancySafe,
       sensitiveMode: !!userPrefs.sensitiveMode,
@@ -375,6 +457,7 @@ FINAL CHECK BEFORE YOU ANSWER:
     // Richness check: if too short/generic, retry once with a corrective instruction.
     try {
       this.assertRichEnough(json);
+      this.assertPreferenceCompliance(json, userPreferences);
       return json;
     } catch (err) {
       console.warn("Skin analysis too generic/short. Retrying once:", err);
@@ -388,7 +471,7 @@ FINAL CHECK BEFORE YOU ANSWER:
             content: [
               {
                 type: "text",
-                text: 'Your last output was too generic/short. Expand with specific step frequencies and conditions, and ensure routine.weekly includes: Daily base (AM), Daily base (PM), Active cycle (Mon–Sun) with treatment vs barrier nights, Ramp-up (4 weeks), and Rules. Recommend products by slot and follow the "worth it / best value" rule. Return valid JSON only.',
+                text: "Your last output did not satisfy the requirements. Expand with specific step frequencies and conditions, ensure routine.weekly includes Daily base (AM), Daily base (PM), Active cycle (Mon-Sun), Ramp-up (4 weeks), and Rules, and strictly obey all user preferences. If fragranceFree=true, include only fragrance-free products. If pregnancySafe=true, do not mention or recommend retinoids anywhere. Follow the worth it / best value rule. Return valid JSON only.",
               },
             ],
           },
@@ -408,9 +491,12 @@ FINAL CHECK BEFORE YOU ANSWER:
       // Return retry output even if still imperfect
       try {
         this.assertRichEnough(json2);
+        this.assertPreferenceCompliance(json2, userPreferences);
         return json2;
       } catch {
-        return json2;
+        throw new Error(
+          "Model output did not comply with required user preferences"
+        );
       }
     }
   }

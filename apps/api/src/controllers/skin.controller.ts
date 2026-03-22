@@ -11,6 +11,12 @@ import { pineconeService } from "../services/pinecone.service";
 import { imageProcessingService } from "../services/imageProcessing.service";
 import { SkinAnalysisLogModel } from "../models/SkinAnalysisLog.model";
 
+const VALID_VALUE_FOCUS = new Set<ValueFocus>([
+  "best_value",
+  "midrange_worth_it",
+  "splurge_if_unique",
+]);
+
 export class SkinController {
   /**
    * Main endpoint: Analyze uploaded face photo and return skincare routine + recommendations
@@ -37,7 +43,27 @@ export class SkinController {
           ? Number(ageRaw)
           : undefined;
 
-      const valueFocus = String(req.body.valueFocus ?? "best_value");
+      if (
+        typeof age === "number" &&
+        (!Number.isInteger(age) || age < 10 || age > 90)
+      ) {
+        res.status(400).json({
+          success: false,
+          error: "Age must be an integer between 10 and 90",
+        } as ApiResponse<never>);
+        return;
+      }
+
+      const valueFocusRaw = String(req.body.valueFocus ?? "best_value");
+      if (!VALID_VALUE_FOCUS.has(valueFocusRaw as ValueFocus)) {
+        res.status(400).json({
+          success: false,
+          error:
+            "Invalid value focus. Use best_value, midrange_worth_it, or splurge_if_unique",
+        } as ApiResponse<never>);
+        return;
+      }
+      const valueFocus = valueFocusRaw as ValueFocus;
 
       const fragranceFree = req.body.fragranceFree === "true";
       const pregnancySafe = req.body.pregnancySafe === "true";
@@ -73,8 +99,8 @@ export class SkinController {
       // 4) AI skin analysis (structured JSON)
       const userPrefs: SkinAnalysisRequest = {
         goals,
-        age: Number.isFinite(age as number) ? (age as number) : undefined,
-        valueFocus: valueFocus as ValueFocus,
+        age,
+        valueFocus,
         fragranceFree,
         pregnancySafe,
         sensitiveMode,
@@ -98,7 +124,7 @@ export class SkinController {
               model: "gpt-4o-mini",
               processingTimeMs: Date.now() - startTime,
               goals,
-              age: Number.isFinite(age as number) ? (age as number) : undefined,
+              age,
               valueFocus,
               fragranceFree,
               pregnancySafe,
