@@ -5,10 +5,54 @@
   color: #1f2937;
   background:
     radial-gradient(circle at top, #fff6d8 0%, #fff9eb 28%, #f6f1e8 100%);
+  --bg-main: radial-gradient(circle at top, #fff6d8 0%, #fff9eb 28%, #f6f1e8 100%);
+  --text-primary: #1f2937;
+  --text-secondary: #665945;
+  --text-tertiary: #544833;
+  --surface-card: rgba(255, 251, 242, 0.76);
+  --surface-elevated: rgba(255, 252, 244, 0.72);
+  --surface-input: rgba(255, 255, 255, 0.86);
+  --surface-input-soft: rgba(255, 255, 255, 0.82);
+  --surface-strong: #fff8df;
+  --surface-accent: #fff1b3;
+  --surface-pill: rgba(255, 246, 212, 0.9);
+  --border-soft: rgba(75, 59, 33, 0.12);
+  --border-strong: rgba(75, 59, 33, 0.16);
+  --shadow-soft: rgba(91, 70, 27, 0.08);
+  --shadow-strong: rgba(84, 65, 25, 0.12);
+  --accent-primary: #ffcc00;
+  --accent-primary-hover: #e6b800;
+  --accent-text: #2b2b3c;
+  --warning-text: #996d00;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+:root[data-theme="dark"] {
+  color: #e8dcc4;
+  background:
+    radial-gradient(circle at top, #3a3429 0%, #191713 34%, #0f0d0a 100%);
+  --bg-main: radial-gradient(circle at top, #3a3429 0%, #191713 34%, #0f0d0a 100%);
+  --text-primary: #efe3ca;
+  --text-secondary: #c5b393;
+  --text-tertiary: #d8c4a0;
+  --surface-card: rgba(31, 27, 22, 0.88);
+  --surface-elevated: rgba(35, 31, 25, 0.86);
+  --surface-input: rgba(49, 43, 35, 0.94);
+  --surface-input-soft: rgba(43, 37, 30, 0.92);
+  --surface-strong: rgba(48, 41, 33, 0.96);
+  --surface-accent: #5b4612;
+  --surface-pill: rgba(82, 66, 22, 0.88);
+  --border-soft: rgba(232, 220, 196, 0.12);
+  --border-strong: rgba(232, 220, 196, 0.18);
+  --shadow-soft: rgba(0, 0, 0, 0.22);
+  --shadow-strong: rgba(0, 0, 0, 0.32);
+  --accent-primary: #d6a520;
+  --accent-primary-hover: #e1b73a;
+  --accent-text: #19150e;
+  --warning-text: #ffcf66;
 }
 
 *,
@@ -25,6 +69,9 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  color: var(--text-primary);
+  background: var(--bg-main);
+  transition: background 0.22s ease, color 0.22s ease;
 }
 
 #root {
@@ -53,18 +100,18 @@ textarea {
 
 button {
   border-radius: 12px;
-  border: 1px solid rgba(39, 31, 17, 0.12);
+  border: 1px solid var(--border-soft);
   padding: 0.75rem 1rem;
-  background: #fff8df;
-  color: #3a3123;
+  background: var(--surface-strong);
+  color: var(--text-primary);
   cursor: pointer;
   transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
 }
 
 button:hover {
   transform: translateY(-1px);
-  box-shadow: 0 10px 18px rgba(92, 68, 24, 0.08);
-  background: #fff3c2;
+  box-shadow: 0 10px 18px var(--shadow-soft);
+  background: var(--surface-pill);
 }
 
 button:focus-visible,

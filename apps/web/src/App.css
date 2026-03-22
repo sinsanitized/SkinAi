@@ -1,3 +1,32 @@
 #root {
   min-height: 100vh;
 }
+
+.appShell {
+  min-height: 100vh;
+}
+
+.appToolbar {
+  display: flex;
+  justify-content: flex-end;
+  width: min(1120px, calc(100% - 2rem));
+  margin: 0 auto;
+  padding-top: 1rem;
+}
+
+.themeToggle {
+  min-width: 130px;
+  border-radius: 999px;
+  padding: 0.7rem 1rem;
+  background: var(--surface-strong);
+  color: var(--text-primary);
+  border: 1px solid var(--border-soft);
+  box-shadow: 0 10px 20px var(--shadow-soft);
+}
+
+@media (max-width: 640px) {
+  .appToolbar {
+    width: min(100% - 1rem, 1120px);
+    padding-top: 0.75rem;
+  }
+}
