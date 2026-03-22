@@ -234,9 +234,9 @@ export const ImageUpload: React.FC<Props> = ({
       />
 
       {!preview ? (
-        <div className="image-upload-input" style={{ width: "100%" }}>
-          {/* Drag & drop box */}
+        <div className="image-upload-input">
           <div
+            className="image-upload-dropzone"
             role="button"
             tabIndex={0}
             onClick={openLibrary}
@@ -244,46 +244,23 @@ export const ImageUpload: React.FC<Props> = ({
               if (e.key === "Enter" || e.key === " ") openLibrary();
             }}
             aria-label="Upload a face photo by choosing a file"
-            style={{
-              width: "100%",
-              maxWidth: 520,
-              cursor: "pointer",
-              padding: "1.25rem",
-              border: "2px dashed #d1d5db",
-              borderRadius: "10px",
-              textAlign: "center",
-            }}
           >
-            <strong>Upload a photo</strong>
-            <div style={{ marginTop: "0.25rem", opacity: 0.75 }}>
-              Drag & drop on desktop or tap to choose
-            </div>
+            <strong>Upload a clear face photo</strong>
+            <p className="image-upload-copy">
+              Drag and drop on desktop or tap to choose from your device.
+            </p>
           </div>
 
-          <div
-            style={{
-              width: "100%",
-              maxWidth: 520,
-              display: "grid",
-              gap: "0.75rem",
-            }}
-          >
+          <div className="image-upload-actions">
             <button
               type="button"
               onClick={openLibrary}
-              style={{ width: "100%" }}
+              className="image-upload-primary"
             >
               Choose Photo
             </button>
 
-            <div
-              style={{
-                display: "flex",
-                gap: "0.75rem",
-                justifyContent: "center",
-                flexWrap: "wrap",
-              }}
-            >
+            <div className="image-upload-secondary-actions">
               <button type="button" onClick={openMobileCamera}>
                 Take Photo (Mobile)
               </button>
@@ -294,40 +271,22 @@ export const ImageUpload: React.FC<Props> = ({
           </div>
 
           {webcamError && (
-            <div
-              role="alert"
-              aria-live="assertive"
-              style={{ marginTop: "0.75rem", color: "#b91c1c" }}
-            >
+            <div className="image-upload-error" role="alert" aria-live="assertive">
               {webcamError}
             </div>
           )}
 
           {showWebcam && (
-            <div
-              style={{
-                marginTop: "1rem",
-                width: "100%",
-                maxWidth: 520,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: "0.75rem",
-              }}
-            >
+            <div className="image-upload-webcam">
               <video
                 ref={videoRef}
                 autoPlay
                 playsInline
                 muted
                 aria-label="Live webcam preview"
-                style={{
-                  width: "100%",
-                  borderRadius: "10px",
-                  border: "1px solid #d1d5db",
-                }}
+                className="image-upload-video"
               />
-              <div style={{ display: "flex", gap: "0.5rem" }}>
+              <div className="image-upload-webcam-actions">
                 <button
                   type="button"
                   onClick={captureFromWebcam}
@@ -343,7 +302,7 @@ export const ImageUpload: React.FC<Props> = ({
                   Cancel
                 </button>
               </div>
-              <div style={{ fontSize: 12, opacity: 0.7, textAlign: "center" }}>
+              <div className="image-upload-copy">
                 Webcam requires HTTPS (or localhost) and camera permission.
               </div>
             </div>
@@ -356,29 +315,21 @@ export const ImageUpload: React.FC<Props> = ({
             className="image-upload-preview"
             alt="Selected photo preview"
           />
-          <div
-            style={{
-              marginTop: "0.75rem",
-              display: "flex",
-              gap: "0.5rem",
-              justifyContent: "center",
-              flexWrap: "wrap",
-            }}
-          >
+          <div className="image-upload-webcam-actions">
             <button type="button" onClick={openLibrary}>
-              Replace (Choose)
+              Replace Photo
             </button>
             <button type="button" onClick={openMobileCamera}>
-              Replace (Mobile Camera)
+              Retake on Mobile
             </button>
             <button type="button" onClick={startWebcam}>
-              Replace (Webcam)
+              Retake with Webcam
             </button>
             <button
               type="button"
               onClick={handleRemove}
               aria-label="Remove selected photo"
-              style={{ backgroundColor: "#e02424", color: "white" }}
+              className="image-upload-remove"
             >
               Remove
             </button>

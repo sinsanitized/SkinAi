@@ -12,6 +12,16 @@
   letter-spacing: -0.04em;
 }
 
+.warningBanner {
+  margin-bottom: 1.2rem;
+  padding: 1rem 1.1rem;
+  border-radius: 18px;
+  border: 1px solid rgba(217, 119, 6, 0.25);
+  background: color-mix(in srgb, var(--surface-card) 82%, #fef3c7);
+  color: var(--text-primary);
+  box-shadow: 0 16px 28px var(--shadow-soft);
+}
+
 .topRow {
   display: grid;
   grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
@@ -39,6 +49,25 @@
   min-width: 0;
 }
 
+.summaryStack {
+  display: grid;
+  gap: 0.9rem;
+  margin-bottom: 1.25rem;
+}
+
+.summaryItem {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.summaryLabel {
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+}
+
 .summaryCard h2,
 .card h2 {
   margin-bottom: 0.85rem;
@@ -54,6 +83,47 @@
   margin: 0.1rem 0 1.2rem;
   background: var(--surface-pill);
   font-weight: 700;
+}
+
+.confidencePill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: fit-content;
+  padding: 0.65rem 0.9rem;
+  border-radius: 999px;
+  font-weight: 800;
+  border: 1px solid transparent;
+}
+
+.confidenceHigh {
+  background: rgba(22, 163, 74, 0.12);
+  border-color: rgba(22, 163, 74, 0.28);
+  color: #166534;
+}
+
+.confidenceMedium {
+  background: rgba(202, 138, 4, 0.14);
+  border-color: rgba(202, 138, 4, 0.28);
+  color: #a16207;
+}
+
+.confidenceLow {
+  background: rgba(220, 38, 38, 0.12);
+  border-color: rgba(220, 38, 38, 0.26);
+  color: #b91c1c;
+}
+
+:root[data-theme="dark"] .confidenceHigh {
+  color: #8ae6a5;
+}
+
+:root[data-theme="dark"] .confidenceMedium {
+  color: #ffd77a;
+}
+
+:root[data-theme="dark"] .confidenceLow {
+  color: #ff9a9a;
 }
 
 .concerns {
@@ -167,8 +237,16 @@
 }
 
 .start-over-btn {
-  display: block;
-  margin: 1.5rem auto 0;
+  min-width: 220px;
+  padding: 0.95rem 1.2rem;
+  border-radius: 16px;
+  border: 1px solid var(--border-soft);
+  background: var(--accent-primary);
+  color: var(--accent-text);
+  font-weight: 800;
+}
+
+.secondary-btn {
   min-width: 220px;
   padding: 0.95rem 1.2rem;
   border-radius: 16px;
@@ -176,6 +254,14 @@
   background: var(--surface-accent);
   color: var(--text-primary);
   font-weight: 700;
+}
+
+.resultActions {
+  display: flex;
+  justify-content: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  margin-top: 1.5rem;
 }
 
 @media (max-width: 900px) {
@@ -208,5 +294,14 @@
 
   .grid {
     gap: 1rem;
+  }
+
+  .resultActions {
+    flex-direction: column;
+  }
+
+  .start-over-btn,
+  .secondary-btn {
+    width: 100%;
   }
 }

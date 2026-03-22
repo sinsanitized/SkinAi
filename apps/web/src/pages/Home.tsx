@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ImageUpload } from "../components/ImageUpload/ImageUpload";
 import SkinAnalysisLoader from "../components/SkinAnalysisLoader/SkinAnalysisLoader";
 import { skinAnalysisApi } from "../services/skinAnalysisApi";
@@ -7,6 +7,18 @@ import type { SkinAnalysisRequest, ValueFocus } from "@skinai/shared-types";
 import "./Home.css";
 
 const RESULT_STORAGE_KEY = "skinai:last-result";
+const DEFAULT_ANALYSIS_OPTIONS: SkinAnalysisRequest = {
+  goals: "",
+  age: 38,
+  valueFocus: "best_value",
+  fragranceFree: false,
+  pregnancySafe: false,
+  sensitiveMode: false,
+};
+
+interface HomeLocationState {
+  draftOptions?: SkinAnalysisRequest;
+}
 
 function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -20,20 +32,17 @@ function fileToDataUrl(file: File): Promise<string> {
 function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
-
-  const [analysisOptions, setAnalysisOptions] = useState<SkinAnalysisRequest>({
-    goals: "",
-    age: 38,
-    valueFocus: "best_value",
-    fragranceFree: false,
-    pregnancySafe: false,
-    sensitiveMode: false,
-  });
-
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const navigate = useNavigate();
+  const location = useLocation();
+  const locationState = location.state as HomeLocationState | null;
+  const [analysisOptions, setAnalysisOptions] = useState<SkinAnalysisRequest>(
+    locationState?.draftOptions ?? DEFAULT_ANALYSIS_OPTIONS
+  );
 
   const handleAnalyze = async () => {
     if (!file) return alert("Please upload a face photo first!");
+    setErrorMessage(null);
     setLoading(true);
 
     try {
@@ -61,18 +70,31 @@ function Home() {
     } catch (err: any) {
       setLoading(false);
       console.error(err);
-      alert(err?.message || "Failed to analyze skin");
+      setErrorMessage(err?.message || "Failed to analyze skin");
     }
   };
 
   return (
     <main className="home-container">
-      <h1 className="title">SkinAI 🧴</h1>
+      <section className="heroPanel">
+        <p className="eyebrow">Structured skincare guidance</p>
+        <h1 className="title">SkinAI 🧴</h1>
+        <p className="heroCopy">
+          Upload a clear face photo, add any concerns that matter to you, and
+          get a cleaner routine breakdown instead of raw AI output.
+        </p>
+      </section>
 
       {loading ? (
         <SkinAnalysisLoader />
       ) : (
         <>
+          {errorMessage ? (
+            <div className="errorBanner" role="alert" aria-live="assertive">
+              {errorMessage}
+            </div>
+          ) : null}
+
           <ImageUpload
             onImagesSelected={(files) => setFile(files[0] ?? null)}
             onRemove={() => setFile(null)}
@@ -80,14 +102,14 @@ function Home() {
 
           <div className="context-box">
             <label className="context-label" htmlFor="skin-goals">
-              Goals (optional)
+              Describe your skin concerns
             </label>
-            <input
+            <textarea
               id="skin-goals"
-              type="text"
               className="context-input"
-              placeholder='e.g. "acne + dark spots", "redness", "oil control"'
+              placeholder="Describe your skin concerns (e.g., acne, redness, dryness)"
               value={analysisOptions.goals || ""}
+              rows={4}
               onChange={(e) =>
                 setAnalysisOptions((currentOptions) => ({
                   ...currentOptions,
@@ -95,6 +117,7 @@ function Home() {
                 }))
               }
             />
+            <p className="helperText">More detail improves accuracy.</p>
           </div>
 
           <div className="prefs-grid">
