@@ -48,6 +48,18 @@ function stringifyForComplianceCheck(value: unknown): string {
   return "";
 }
 
+function sanitizeText(
+  text: string,
+  terms: readonly string[],
+  replacement: string
+): string {
+  let sanitized = text;
+  for (const term of terms) {
+    sanitized = sanitized.replace(new RegExp(term, "gi"), replacement);
+  }
+  return sanitized;
+}
+
 /**
  * Helper function to safely extract JSON from LLM responses.
  * More reliable than a greedy regex: takes the first "{" and last "}".
@@ -70,6 +82,142 @@ const EMBEDDING_CONFIG = {
 } as const;
 
 export class OpenAIService {
+  private normalizeAnalysisResponse(
+    json: SkinAnalysisResponse
+  ): SkinAnalysisResponse {
+    return {
+      ...json,
+      explanation: {
+        skinTypeExplanation:
+          json.explanation?.skinTypeExplanation?.trim() ||
+          `Your skin appears ${json.skinType.type.toLowerCase()}, which helps explain the balance of oil, hydration, and sensitivity cues seen in the photo.`,
+        productBenefits:
+          json.explanation?.productBenefits?.filter(Boolean)?.length
+            ? json.explanation.productBenefits
+            : [
+                "The recommended routine focuses on supporting the skin barrier while targeting the most visible concerns from the photo.",
+                "Consistent use of the selected treatments should improve texture, tone, and overall skin stability over time.",
+              ],
+        layeringGuide:
+          json.explanation?.layeringGuide?.filter(Boolean)?.length
+            ? json.explanation.layeringGuide
+            : [
+                "Start with the thinnest product textures first and move toward thicker creams last.",
+                "Apply treatment steps before moisturizer unless a product specifically says to use it as the last treatment step.",
+                "Finish every morning routine with sunscreen as the final layer.",
+              ],
+      },
+      routine: {
+        AM: json.routine?.AM ?? [],
+        PM: json.routine?.PM ?? [],
+        weekly: json.routine?.weekly ?? [],
+      },
+      concerns: json.concerns ?? [],
+      ingredients: json.ingredients ?? [],
+      products: json.products ?? [],
+      conflicts: json.conflicts ?? [],
+      disclaimers: json.disclaimers ?? [],
+      timestamp: json.timestamp || new Date().toISOString(),
+    };
+  }
+
+  private sanitizeForPreferences(
+    json: SkinAnalysisResponse,
+    prefs: {
+      age?: number;
+      valueFocus: ValueFocus;
+      fragranceFree: boolean;
+      pregnancySafe: boolean;
+      sensitiveMode: boolean;
+    }
+  ): SkinAnalysisResponse {
+    const sanitized = this.normalizeAnalysisResponse(json);
+
+    if (prefs.fragranceFree) {
+      sanitized.products = sanitized.products.filter((product) => {
+        const productText = stringifyForComplianceCheck(product);
+        return !containsAnyTerm(productText, FRAGRANCE_TERMS);
+      });
+
+      sanitized.disclaimers = [
+        ...sanitized.disclaimers,
+        "Fragrance-free mode was applied. Products with fragrance-related wording were removed from the recommendations.",
+      ];
+    }
+
+    if (prefs.pregnancySafe) {
+      sanitized.ingredients = sanitized.ingredients.filter((ingredient) => {
+        const ingredientText = stringifyForComplianceCheck(ingredient);
+        return !containsAnyTerm(ingredientText, PREGNANCY_UNSAFE_TERMS);
+      });
+
+      sanitized.products = sanitized.products.filter((product) => {
+        const productText = stringifyForComplianceCheck(product);
+        return !containsAnyTerm(productText, PREGNANCY_UNSAFE_TERMS);
+      });
+
+      sanitized.conflicts = sanitized.conflicts.filter((conflict) => {
+        const conflictText = stringifyForComplianceCheck(conflict);
+        return !containsAnyTerm(conflictText, PREGNANCY_UNSAFE_TERMS);
+      });
+
+      sanitized.routine = {
+        ...sanitized.routine,
+        AM: sanitized.routine.AM.map((step) =>
+          sanitizeText(
+            step,
+            PREGNANCY_UNSAFE_TERMS,
+            "pregnancy-safe alternative active"
+          )
+        ),
+        PM: sanitized.routine.PM.map((step) =>
+          sanitizeText(
+            step,
+            PREGNANCY_UNSAFE_TERMS,
+            "pregnancy-safe alternative active"
+          )
+        ),
+        weekly: (sanitized.routine.weekly ?? []).map((step) =>
+          sanitizeText(
+            step,
+            PREGNANCY_UNSAFE_TERMS,
+            "pregnancy-safe alternative active"
+          )
+        ),
+      };
+
+      sanitized.explanation = {
+        ...sanitized.explanation,
+        skinTypeExplanation: sanitizeText(
+          sanitized.explanation.skinTypeExplanation,
+          PREGNANCY_UNSAFE_TERMS,
+          "pregnancy-safe alternative active"
+        ),
+        productBenefits: sanitized.explanation.productBenefits.map((benefit) =>
+          sanitizeText(
+            benefit,
+            PREGNANCY_UNSAFE_TERMS,
+            "pregnancy-safe alternative active"
+          )
+        ),
+        layeringGuide: sanitized.explanation.layeringGuide.map((step) =>
+          sanitizeText(
+            step,
+            PREGNANCY_UNSAFE_TERMS,
+            "pregnancy-safe alternative active"
+          )
+        ),
+      };
+
+      sanitized.disclaimers = [
+        ...sanitized.disclaimers,
+        "Pregnancy-safe mode was applied. Retinoid-related recommendations were removed or replaced with safer alternatives.",
+      ];
+    }
+
+    return sanitized;
+  }
+
   /**
    * Generate embeddings from an image.
    * Strategy: ask the vision model for a skin-focused description, then embed that text.
@@ -468,17 +616,15 @@ FINAL CHECK BEFORE YOU ANSWER:
 
     if (!json) throw new Error("Model returned unparseable JSON");
 
-    // Ensure timestamp
-    if (!(json as any).timestamp)
-      (json as any).timestamp = new Date().toISOString();
+    json = this.normalizeAnalysisResponse(json);
 
-    // Richness check: if too short/generic, retry once with a corrective instruction.
+    // Richness and compliance check: retry once if the model response is incomplete.
     try {
       this.assertRichEnough(json);
       this.assertPreferenceCompliance(json, userPreferences);
       return json;
     } catch (err) {
-      console.warn("Skin analysis too generic/short. Retrying once:", err);
+      console.warn("Initial skin analysis failed validation. Retrying once:", err);
 
       const response2 = await openai.chat.completions.create({
         model: "gpt-4o-mini",
@@ -501,20 +647,34 @@ FINAL CHECK BEFORE YOU ANSWER:
       const text2 = response2.choices?.[0]?.message?.content || "";
       const json2 = extractJSON<SkinAnalysisResponse>(text2);
 
-      if (!json2) return json;
+      if (!json2) {
+        const fallback = this.sanitizeForPreferences(json, userPreferences);
+        fallback.disclaimers = [
+          ...fallback.disclaimers,
+          "The model retry did not return valid JSON, so a partial result was returned.",
+        ];
+        return fallback;
+      }
 
-      if (!(json2 as any).timestamp)
-        (json2 as any).timestamp = new Date().toISOString();
+      const normalizedRetry = this.normalizeAnalysisResponse(json2);
 
-      // Return retry output even if still imperfect
+      // Prefer a compliant retry, but return a sanitized fallback instead of failing the request.
       try {
-        this.assertRichEnough(json2);
-        this.assertPreferenceCompliance(json2, userPreferences);
-        return json2;
-      } catch {
-        throw new Error(
-          "Model output did not comply with required user preferences"
+        this.assertRichEnough(normalizedRetry);
+        this.assertPreferenceCompliance(normalizedRetry, userPreferences);
+        return normalizedRetry;
+      } catch (retryErr) {
+        console.warn(
+          "Retry skin analysis failed validation. Returning sanitized fallback:",
+          retryErr
         );
+
+        const fallback = this.sanitizeForPreferences(normalizedRetry, userPreferences);
+        fallback.disclaimers = [
+          ...fallback.disclaimers,
+          "Some recommendations were auto-adjusted because the model response did not fully satisfy the requested safety or formatting rules.",
+        ];
+        return fallback;
       }
     }
   }
