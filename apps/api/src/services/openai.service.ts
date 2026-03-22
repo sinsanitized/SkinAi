@@ -4,6 +4,8 @@ import type {
   SkinAnalysisRequest,
   ValueFocus,
 } from "@skinai/shared-types";
+import { logger } from "../utils/logger";
+import { skinAnalysisResponseSchema } from "../validation/skinAnalysis.schema";
 
 const PREGNANCY_UNSAFE_TERMS = [
   "retinoid",
@@ -72,7 +74,7 @@ function extractJSON<T = any>(text: string): T | null {
     const candidate = text.slice(start, end + 1);
     return JSON.parse(candidate);
   } catch (err) {
-    console.error("Failed to parse JSON:", err);
+    logger.warn("Failed to parse JSON from model output:", err);
     return null;
   }
 }
@@ -193,42 +195,6 @@ export class OpenAIService {
       conflicts: json.conflicts ?? [],
       disclaimers: json.disclaimers ?? [],
       timestamp: json.timestamp || new Date().toISOString(),
-    };
-  }
-
-  private validateAnalysisShape(json: SkinAnalysisResponse): {
-    success: boolean;
-    errors: string[];
-  } {
-    const errors: string[] = [];
-
-    if (!json.skinType?.type) errors.push("Missing skinType.type");
-    if (typeof json.skinType?.confidence !== "number") {
-      errors.push("Missing skinType.confidence");
-    }
-    if (!Array.isArray(json.concerns)) errors.push("Missing concerns array");
-    if (!Array.isArray(json.ingredients))
-      errors.push("Missing ingredients array");
-    if (!Array.isArray(json.products)) errors.push("Missing products array");
-    if (!Array.isArray(json.routine?.AM)) errors.push("Missing routine.AM");
-    if (!Array.isArray(json.routine?.PM)) errors.push("Missing routine.PM");
-    if (!Array.isArray(json.conflicts)) errors.push("Missing conflicts array");
-    if (!Array.isArray(json.disclaimers)) {
-      errors.push("Missing disclaimers array");
-    }
-    if (!json.explanation?.skinTypeExplanation) {
-      errors.push("Missing explanation.skinTypeExplanation");
-    }
-    if (!Array.isArray(json.explanation?.productBenefits)) {
-      errors.push("Missing explanation.productBenefits");
-    }
-    if (!Array.isArray(json.explanation?.layeringGuide)) {
-      errors.push("Missing explanation.layeringGuide");
-    }
-
-    return {
-      success: errors.length === 0,
-      errors,
     };
   }
 
@@ -682,6 +648,15 @@ FINAL CHECK BEFORE YOU ANSWER:
       retrievalContextSummary,
     });
 
+    logger.info(
+      `Retrieved chunk count: ${retrievedContext.length}${
+        retrievedContext.length ? "" : " (base prompt only)"
+      }`
+    );
+    logger.info(
+      `Prompt preview: ${prompt.replace(/\s+/g, " ").slice(0, 280)}...`
+    );
+
     const imageContent = {
       type: "image_url" as const,
       image_url: { url: `data:${mimeType};base64,${imageBase64}` },
@@ -706,6 +681,7 @@ FINAL CHECK BEFORE YOU ANSWER:
       let json = extractJSON<SkinAnalysisResponse>(text1);
 
       if (!json) {
+        logger.warn("Validation failure: malformed JSON on first model response.");
         const responseFix = await openai.chat.completions.create({
           model: "gpt-4o-mini",
           messages: [
@@ -729,6 +705,9 @@ FINAL CHECK BEFORE YOU ANSWER:
       }
 
       if (!json) {
+        logger.warn(
+          "Fallback trigger: model returned malformed JSON after repair attempt."
+        );
         return this.buildSafeFallbackAnalysis({
           prefs: userPreferences,
           reason: "Model returned malformed JSON after one repair attempt",
@@ -737,17 +716,25 @@ FINAL CHECK BEFORE YOU ANSWER:
 
       json = this.normalizeAnalysisResponse(json);
 
-      const shapeValidation = this.validateAnalysisShape(json);
+      const shapeValidation = skinAnalysisResponseSchema.safeParse(json);
       if (!shapeValidation.success) {
-        console.warn(
-          "Skin analysis schema validation failed. Returning fallback:",
-          shapeValidation.errors
+        const validationErrors = shapeValidation.error.issues.map(
+          (issue) => `${issue.path.join(".")}: ${issue.message}`
         );
+
+        logger.warn(
+          `Validation failure: schema validation failed (${validationErrors.join(
+            " | "
+          )})`
+        );
+        logger.warn("Fallback trigger: schema validation failure.");
         return this.buildSafeFallbackAnalysis({
           prefs: userPreferences,
-          reason: `Schema validation failed: ${shapeValidation.errors.join(", ")}`,
+          reason: `Schema validation failed: ${validationErrors.join(", ")}`,
         });
       }
+
+      logger.info("Validation success: response matches schema.");
 
       const qualityWarnings = this.getQualityWarnings(json);
 
@@ -757,10 +744,11 @@ FINAL CHECK BEFORE YOU ANSWER:
       }
       return json;
     } catch (err) {
-      console.warn(
+      logger.warn(
         "Skin analysis failed preference validation. Returning sanitized fallback:",
         err
       );
+      logger.warn("Fallback trigger: preference compliance failure.");
 
       if (err instanceof Error) {
         const rawFallback = this.buildSafeFallbackAnalysis({

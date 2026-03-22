@@ -1,5 +1,6 @@
 import type { Index, RecordMetadata } from "@pinecone-database/pinecone";
 import { getPineconeClient, PINECONE_CONFIG } from "../config/pinecone";
+import { logger } from "../utils/logger";
 
 interface SkinMetadata extends RecordMetadata {
   kind: "analysis";
@@ -66,14 +67,14 @@ export class PineconeService {
           .map((match) => (match.metadata as any).summary as string) || [];
 
       if (!summaries.length) {
-        console.info(
+        logger.info(
           "Pinecone returned no relevant retrieval context. Proceeding without RAG context."
         );
       }
 
       return summaries;
     } catch (error) {
-      console.warn("Pinecone query failed:", error);
+      logger.warn("Pinecone query failed:", error);
       return [];
     }
   }
@@ -101,7 +102,7 @@ export class PineconeService {
         },
       ]);
     } catch (error) {
-      console.warn("Pinecone upsert failed:", error);
+      logger.warn("Pinecone upsert failed:", error);
     }
   }
 
@@ -113,7 +114,7 @@ export class PineconeService {
       await index.describeIndexStats();
       return true;
     } catch (error) {
-      console.warn("Pinecone index health check failed:", error);
+      logger.warn("Pinecone index health check failed:", error);
       return false;
     }
   }

@@ -1,82 +1,50 @@
 # SkinAI
 
-SkinAI is a structured AI inference pipeline for skincare analysis that takes a user-submitted face photo, extracts observable skin signals, retrieves related context, and returns schema-validated skincare recommendations with safety-aware controls.
+SkinAI is a structured AI system that transforms unstructured skin inputs into reliable, actionable skincare routines using retrieval-augmented generation and schema-validated outputs.
 
-This project is not a thin wrapper around a chat model. It is a multi-stage AI pipeline designed to make image-driven recommendations more consistent, auditable, and product-ready.
+It is built to demonstrate production-minded AI engineering, not just model API usage:
 
-## Problem
+- structured AI pipeline
+- retrieval-augmented generation
+- prompt construction with controlled inputs
+- schema-validated outputs
+- safe fallback behavior
+- observability around retrieval, validation, and fallback triggers
 
-Most AI skincare demos follow the same pattern:
+## What It Does
 
-- send an image to an LLM
-- ask for advice in plain English
-- render whatever text comes back
-
-That approach is easy to build, but hard to trust:
-
-- outputs are inconsistent
-- recommendations are difficult to validate
-- user preferences are easy for the model to ignore
-- safety constraints are hard to enforce
-- retrieval and product context are usually missing
-
-## Solution
-
-SkinAI treats skincare analysis like a structured AI system instead of a one-shot prompt.
-
-It combines:
-
-- image preprocessing for stable model inputs
-- image-to-text embeddings for retrieval
-- optional Pinecone-backed context injection
-- structured prompt construction with explicit safety and preference controls
-- strict JSON parsing
-- output normalization and validation
-- fallback behavior when the model is incomplete or non-compliant
-
-The result is a system that is easier to reason about, easier to extend, and much more portfolio-ready than a naive “call GPT and return text” prototype.
-
-## Key Features
-
-- Photo-based skin analysis focused on observable traits rather than diagnosis
-- Structured JSON output for predictable rendering and downstream validation
-- Support for user controls such as `goals`, `age`, `valueFocus`, `fragranceFree`, `pregnancySafe`, and `sensitiveMode`
-- Retrieval-augmented generation (RAG) using embeddings + Pinecone context search
-- Safety-aware compliance layer for pregnancy-safe and fragrance-free modes
-- Output normalization to preserve a stable response shape when the model is imperfect
-- Human-readable explanation layer for skin type, product benefits, and product stacking
-- Monorepo layout with shared types between frontend and backend
-
-## Product Outcome
-
-Given a face photo, SkinAI returns:
+Given a face photo and optional user preferences, SkinAI returns:
 
 - estimated skin type with confidence
-- visible skin concerns with supporting evidence
-- ingredient recommendations with cautions
-- product picks aligned to observed issues and user preferences
-- a practical AM/PM/weekly routine
-- conflict warnings for ingredient combinations
-- a plain-language explanation of why the plan makes sense
+- visible skin concerns and evidence
+- recommended ingredients
+- product suggestions
+- AM / PM / weekly routine guidance
+- conflict warnings
+- plain-language explanation of why the routine makes sense
+
+It is explicitly non-diagnostic and intended for skincare guidance, not medical advice.
 
 ## 🧴 Example User Outcome
 
 ### Input
 
-User uploads a photo showing:
+User concern:
 
-- active acne around the chin and cheeks
-- visible redness after breakouts
-- early dehydration from overuse of harsh actives
+- acne + redness with some dehydration from overuse of harsh actives
 
 User preferences:
 
-- `goals`: "reduce acne marks and calm redness"
-- `age`: `29`
-- `valueFocus`: `best_value`
-- `fragranceFree`: `true`
-- `pregnancySafe`: `false`
-- `sensitiveMode`: `true`
+```json
+{
+  "goals": "reduce acne marks and calm redness",
+  "age": 29,
+  "valueFocus": "best_value",
+  "fragranceFree": true,
+  "pregnancySafe": false,
+  "sensitiveMode": true
+}
+```
 
 ### Structured JSON Output
 
@@ -84,7 +52,7 @@ User preferences:
 {
   "skinType": {
     "type": "Combination / Acne-prone",
-    "confidence": 0.86
+    "confidence": 0.82
   },
   "explanation": {
     "skinTypeExplanation": "Your skin shows oilier congestion in the central face with more reactive areas around the cheeks, which is consistent with a combination acne-prone pattern.",
@@ -108,7 +76,7 @@ User preferences:
     {
       "name": "Barrier impairment",
       "severity": "Mild",
-      "confidence": 0.65,
+      "confidence": 0.64,
       "evidence": "Diffuse redness and dryness suggest the barrier may be stressed."
     }
   ],
@@ -171,614 +139,412 @@ User preferences:
 }
 ```
 
-### Human-Readable Outcome
+### Human-Readable Explanation
 
-The user receives more than a generic paragraph. They get:
+This user gets more than a generic paragraph. They get:
 
 - a condition classification: combination / acne-prone skin
-- severity signals: moderate post-breakout redness, mild barrier stress
-- a practical AM/PM routine they can follow immediately
-- targeted ingredients like azelaic acid and ceramides
-- a confidence score indicating how strongly the model supports the classification
-- a plain-language explanation of why each recommendation was chosen
+- severity signals: moderate post-breakout redness and mild barrier stress
+- a practical AM / PM routine
+- ingredient-level guidance such as azelaic acid and ceramides
+- a confidence signal via `skinType.confidence`
+- explanation of what the routine is doing and how to layer it
 
-That is the product value: a user can go from “my skin looks irritated and breakout-prone” to “here is a structured routine, here is why it fits my skin, and here is how to use it.”
-
-## Architecture Overview
-
-SkinAI is built as a monorepo with a React frontend, Express API, and shared TypeScript contracts.
-
-### Monorepo Structure
-
-```text
-.
-├── apps
-│   ├── api
-│   │   ├── src
-│   │   │   ├── config
-│   │   │   ├── controllers
-│   │   │   ├── middleware
-│   │   │   ├── models
-│   │   │   ├── routes
-│   │   │   ├── services
-│   │   │   └── utils
-│   └── web
-│       └── src
-│           ├── components
-│           ├── pages
-│           ├── services
-│           └── styles
-└── packages
-    ├── shared-types
-    └── utils
-```
-
-### Logical Backend Modules
-
-Even though the backend is intentionally compact, it already separates the AI system into clear responsibilities:
-
-- `controllers/skin.controller.ts`
-  Handles request orchestration and API response lifecycle
-- `services/imageProcessing.service.ts`
-  Normalizes uploaded images before they reach the model
-- `services/openai.service.ts`
-  Owns prompt construction, model calls, parsing, compliance checks, and fallback logic
-- `services/pinecone.service.ts`
-  Handles retrieval and vector persistence
-- `middleware/imageUploadValidation.ts`
-  Rejects invalid uploads before model work begins
-- `models/SkinAnalysisLog.model.ts`
-  Stores analysis metadata for observability and auditability
-- `packages/shared-types`
-  Defines the output contract shared between frontend and backend
-
-## System Architecture
-
-### End-to-End Flow
-
-```text
-User Input
-   |
-   v
-Frontend Form + Photo Upload
-   |
-   v
-API Validation
-   |
-   v
-Image Preprocessing
-   |
-   v
-Vision Description -> Embedding Generation
-   |
-   v
-Vector Retrieval (Pinecone, optional)
-   |
-   v
-Prompt Construction
-   |
-   v
-LLM Structured Generation
-   |
-   v
-JSON Parsing + Validation + Preference Compliance
-   |
-   v
-Sanitization / Fallback Handling
-   |
-   v
-Structured Output + UI Rendering
-```
+The value is immediate: the system turns an unstructured skin concern into an actionable, reviewable plan.
 
 ## 🚫 Not Just Another GPT Wrapper
 
-Typical AI demos stop at:
+Typical AI apps:
 
-- upload input
-- send it to an LLM
-- render raw text
+- send raw input to an LLM
+- return unstructured text
+- trust the model to behave
+- break when the response format drifts
 
-That approach is fast to build, but weak as a system:
+SkinAI takes a different approach:
 
-- outputs are unstructured
-- malformed responses break the UI
-- hallucinations are harder to detect
-- user safety controls are easy to ignore
-- there is no consistent contract between backend and frontend
+- uses retrieval-augmented generation (RAG) for grounded responses
+- enforces structured JSON schema validation before returning data
+- validates outputs with `safeParse(...)` instead of trusting raw model output
+- normalizes partial responses into a stable shape
+- applies safe fallback behavior when the model pipeline is unreliable
 
-SkinAI is explicitly engineered to avoid that pattern.
+This is a structured AI pipeline with reliability controls, not a prompt-wrapped chatbot.
 
-This system:
+## 🧠 System Architecture
 
-- uses retrieval-augmented generation (RAG) to ground recommendations in retrieved context
-- enforces a schema-validated JSON contract instead of returning arbitrary prose
-- validates outputs before sending them to the frontend
-- normalizes missing fields into a stable structure
-- sanitizes unsafe or preference-violating content instead of trusting the model blindly
-
-The result is a production-minded AI system, not a generic GPT wrapper with a skincare prompt.
+```text
+User Input
+  ↓
+Preprocessing
+  ↓
+Embedding + Retrieval
+  ↓
+Context Injection
+  ↓
+Prompt Construction
+  ↓
+LLM
+  ↓
+Schema Validation
+  ↓
+Structured Output
+```
 
 ### Why Each Step Exists
 
 #### 1. User Input
 
-Inputs include:
+The frontend collects:
 
-- face image
-- free-text goals
+- face photo
+- goals
 - age
-- value preference
+- value focus
 - fragrance-free mode
 - pregnancy-safe mode
 - sensitive mode
 
-Why it exists:
+Why:
 
-- captures product-level preferences without forcing the model to infer everything from the image
-- gives the system controllable levers for personalization
+- these inputs steer the recommendations when they do not conflict with visible findings
+- safety toggles are explicit rather than inferred
 
-#### 2. Image Preprocessing
+#### 2. Preprocessing
 
-The backend resizes and normalizes the uploaded image before inference.
+Images are resized and normalized before inference.
 
-Why it exists:
+Why:
 
-- reduces variation from extreme image sizes
-- avoids unnecessary token and bandwidth cost
-- creates more consistent model inputs
+- stabilizes inputs
+- reduces unnecessary bandwidth and token waste
+- gives the model more consistent image payloads
 
-#### 3. Embeddings
+#### 3. Embedding + Retrieval
 
-The system first asks the model to describe visible skin features, then embeds that description.
+The system first generates a skin-focused description of the image, then embeds that description for retrieval.
 
-Why it exists:
+Why:
 
-- converts image observations into a searchable semantic representation
-- supports retrieval without indexing raw image pixels
-- makes RAG feasible for a multimodal application
+- image observations become searchable
+- prior context can be injected into the prompt
+- the generation step is less likely to start from zero-context reasoning
 
-#### 4. Retrieval
+#### 4. Context Injection
 
-The embedding is used to fetch similar prior context from Pinecone.
+Retrieved summaries are inserted as optional weak priors.
 
-Why it exists:
+Why:
 
-- grounds generation in related analysis history
-- reduces purely-from-scratch recommendation behavior
-- helps the model stay closer to existing product and concern patterns
+- improves grounding without making retrieval mandatory
+- if retrieval is empty or low quality, the system falls back to the base prompt
 
 #### 5. Prompt Construction
 
-The prompt blends:
+Prompt construction combines:
 
-- observed image context
-- user controls
+- visible image findings
+- user preferences
+- safety rules
 - retrieval context
-- strict output requirements
-- safety requirements
+- exact output shape
 
-Why it exists:
+Why:
 
-- creates deterministic expectations for the model
-- makes product behavior explainable
-- encodes business logic and safety rules close to the inference layer
+- gives the model a controlled inference contract
+- makes product behavior inspectable
 
-#### 6. LLM Generation
+#### 6. LLM
 
-OpenAI generates a strict JSON response that includes skin assessment, routine, product picks, warnings, and explanation text.
+The OpenAI model generates a structured response containing skin classification, concerns, ingredients, products, routine, and explanation.
 
-Why it exists:
+Why:
 
-- enables rich reasoning over image + preferences + retrieved context
-- preserves flexibility without losing schema structure
+- the LLM handles multimodal reasoning while the surrounding pipeline controls the output contract
 
-#### 7. Validation
+#### 7. Schema Validation
 
-The system parses JSON, checks structure, enforces user preference compliance, and normalizes missing fields.
+Responses are parsed, normalized, then validated with a strict runtime schema.
 
-Why it exists:
+Why:
 
-- reduces malformed output risk
-- prevents invalid responses from propagating to the UI
-- keeps the frontend predictable
+- malformed outputs are caught before they reach the UI
+- partial model responses do not silently become frontend bugs
 
-#### 8. Safe Fallback Behavior
+#### 8. Structured Output
 
-If the model output is imperfect but still usable, the backend sanitizes and annotates it instead of failing the request.
+The frontend renders typed data instead of raw text blobs.
 
-Why it exists:
+Why:
 
-- improves reliability under real-world model variance
-- prevents avoidable 500s
-- reduces user-facing failure without silently ignoring constraints
+- stable rendering
+- clearer debugging
+- easier extension into analytics, testing, or downstream services
+
+## 🔍 Retrieval Strategy
+
+SkinAI uses retrieval-augmented generation through vector search in Pinecone.
+
+### Strategy
+
+- the image is first converted into a structured visual description
+- that description is embedded using an OpenAI embedding model
+- Pinecone retrieval searches for the most similar prior summaries
+- only relevant summaries are injected into the prompt
+
+### Retrieval Details
+
+- embedding source:
+  image → skin-focused description → embedding vector
+- similarity method:
+  cosine similarity via Pinecone index metric
+- top-k retrieval:
+  configured in `PINECONE_CONFIG.topK`
+- current implementation:
+  filters out low-score or empty summaries before prompt injection
+
+### Why This Matters
+
+Retrieval is not used for novelty. It is used to reduce drift and ground the generation step in prior structured context.
+
+If retrieval is empty or weak:
+
+- the system logs that RAG context was unavailable
+- the base prompt still runs safely
 
 ## Structured Output Schema
 
-The backend returns a typed `SkinAnalysisResponse` defined in `packages/shared-types`.
+The system returns a typed `SkinAnalysisResponse` and validates it at runtime before returning it to the frontend.
 
-### JSON Shape
+### Example Shape
 
 ```jsonc
 {
   "skinType": {
-    "type": "Combination / Acne-prone", // model-selected skin type enum
-    "confidence": 0.86 // heuristic confidence score from model output
-  },
-  "explanation": {
-    "skinTypeExplanation": "Your skin shows both oilier T-zone behavior and breakout-prone areas, which points to a combination acne-prone profile.",
-    "productBenefits": [
-      "The cleanser and moisturizer pair are meant to reduce barrier stress while keeping congestion under control.",
-      "The serum and sunscreen choices target post-acne marks and reduce further irritation-driven darkening."
-    ],
-    "layeringGuide": [
-      "Apply cleanser first, then any watery layers, then treatment serum, then moisturizer.",
-      "Use thinner textures before thicker creams to reduce pilling and help active layers absorb evenly.",
-      "Finish every AM routine with sunscreen as the last step."
-    ]
-  },
-  "concerns": [
-    {
-      "name": "Post-inflammatory hyperpigmentation (PIH)",
-      "severity": "Moderate",
-      "confidence": 0.79,
-      "evidence": "Visible post-acne marks concentrated on the cheeks and jawline."
-    }
-  ],
-  "ingredients": [
-    {
-      "ingredient": "Azelaic acid",
-      "reason": "Useful for redness, acne, and post-acne marks with relatively good tolerability.",
-      "cautions": ["Start slowly if skin is reactive."]
-    }
-  ],
-  "products": [
-    {
-      "name": "Relief Sun",
-      "brand": "Beauty of Joseon",
-      "category": "Sunscreen",
-      "why": "Supports daily UV protection while staying cosmetically wearable.",
-      "howToUse": "Use as the last AM step.",
-      "cautions": ["Reapply when outdoors."],
-      "tags": ["daily", "barrier-friendly"]
-    }
-  ],
-  "routine": {
-    "AM": [
-      "Cleanser - daily - use a gentle wash if skin feels oily on waking",
-      "Sunscreen - daily - final morning step"
-    ],
-    "PM": [
-      "Cleanser - daily - remove sunscreen and debris",
-      "Treatment serum - 2x-week to start - skip if stinging"
-    ],
-    "weekly": [
-      "Daily base (AM): cleanse, moisturize if needed, sunscreen",
-      "Daily base (PM): cleanse, treat if scheduled, moisturize",
-      "Active cycle (Mon–Sun): Mon treatment | Tue barrier | Wed treatment | Thu barrier | Fri treatment | Sat barrier | Sun barrier",
-      "Ramp-up (4 weeks): Weeks 1–2 once or twice weekly; Weeks 3–4 increase if tolerated; Maintenance as tolerated",
-      "Rules: stop and simplify if irritation builds"
-    ]
-  },
-  "conflicts": [
-    {
-      "ingredients": ["Retinoid", "AHA"],
-      "warning": "Avoid combining on the same night unless tolerance is already established."
-    }
-  ],
-  "disclaimers": [
-    "This is not medical advice."
-  ],
-  "timestamp": "2026-03-22T14:00:00.000Z"
-}
-```
-
-### Field Intent
-
-- `skinType`
-  High-level classification used to guide routine intensity and product balance
-- `explanation`
-  Human-readable reasoning layer for trust, education, and product comprehension
-- `concerns`
-  Observable issues with evidence to reduce hand-wavy recommendations
-- `ingredients`
-  Mechanism-level recommendations rather than only product names
-- `products`
-  Actionable product slots tied to real usage instructions
-- `routine`
-  Ordered application steps plus weekly cadence
-- `conflicts`
-  Explicit risk communication for ingredient stacking
-- `disclaimers`
-  Safety and fallback transparency
-- `timestamp`
-  Basic auditability and freshness marker
-
-## Trust & Reliability Layer
-
-SkinAI includes several reliability controls intended to reduce hallucinations and unstable UX:
-
-### Confidence Signaling
-
-The response includes a `skinType.confidence` score so the UI can communicate uncertainty instead of presenting every classification as equally certain.
-
-This is not a calibrated medical probability. It is an inference confidence signal intended to:
-
-- communicate ambiguity to the user
-- discourage over-trust in weak image conditions
-- support future reliability improvements such as heuristic or benchmark-based calibration
-
-### 1. Prompt Constraining
-
-The prompt enforces:
-
-- exact JSON output
-- known skin type enums
-- product slot coverage
-- weekly plan structure
-- preference-specific constraints
-
-### 2. Output Parsing
-
-The backend extracts and parses JSON from the model response instead of trusting arbitrary text.
-
-### 3. Schema Normalization
-
-If optional sections are missing, the API fills them with stable defaults so the frontend never needs to guess.
-
-### 4. Preference Compliance
-
-The system checks generated output against critical user preferences such as:
-
-- pregnancy-safe mode
-- fragrance-free mode
-- allowed `valueFocus` enum
-- valid age range
-
-### 5. Safe Fallback
-
-When the model returns something imperfect:
-
-- the API sanitizes non-compliant content where possible
-- adds disclaimers for transparency
-- returns a stable result instead of failing outright
-
-### 6. Retrieval Grounding
-
-Pinecone context injection reduces fully ungrounded generation and helps align recommendations to prior analysis patterns.
-
-### Hallucination Reduction Strategy
-
-SkinAI reduces hallucination risk through multiple layers rather than relying on prompt phrasing alone:
-
-- retrieved context narrows the model’s search space
-- structured output requirements prevent rambling free text
-- preference compliance checks catch obvious unsafe content
-- normalization and fallback handling avoid brittle UI behavior
-
-This does not eliminate hallucinations entirely, but it significantly improves reliability compared with a raw chat response.
-
-### Non-Medical Scope
-
-SkinAI is not a diagnostic or medical system. It focuses on visible skincare-related observations and routine suggestions, and it should not be treated as a substitute for clinical evaluation.
-
-## Example Input / Output
-
-### Sample Input
-
-```json
-{
-  "image": "face-photo.jpg",
-  "goals": "reduce acne marks and calm redness",
-  "age": 29,
-  "valueFocus": "best_value",
-  "fragranceFree": true,
-  "pregnancySafe": false,
-  "sensitiveMode": true
-}
-```
-
-### Sample Structured Output
-
-```json
-{
-  "skinType": {
     "type": "Combination / Acne-prone",
-    "confidence": 0.86
+    "confidence": 0.82
   },
   "explanation": {
-    "skinTypeExplanation": "Your skin shows oilier congestion in the central face with more reactive areas around the cheeks, which is consistent with a combination acne-prone pattern.",
-    "productBenefits": [
-      "The routine emphasizes barrier-friendly anti-inflammatory ingredients so redness and post-acne marks improve without pushing the skin too hard.",
-      "The selected products focus on high-value actives and lower-irritation textures, which fits both sensitive mode and a best-value preference."
-    ],
-    "layeringGuide": [
-      "Use cleanser first, then watery layers, then treatment serum, then moisturizer.",
-      "Keep active treatments before moisturizer unless a product specifically instructs otherwise.",
-      "In the morning, sunscreen should always be the final layer."
-    ]
+    "skinTypeExplanation": "...",
+    "productBenefits": ["..."],
+    "layeringGuide": ["..."]
   },
   "concerns": [
     {
       "name": "Post-inflammatory erythema (PIE)",
       "severity": "Moderate",
       "confidence": 0.78,
-      "evidence": "Red post-breakout marks visible across the cheeks."
+      "evidence": "..."
     }
   ],
   "ingredients": [
     {
       "ingredient": "Azelaic acid",
-      "reason": "Supports redness reduction and post-breakout mark improvement while remaining relatively gentle.",
-      "cautions": [
-        "Start slowly if skin feels tight or reactive."
-      ]
+      "reason": "...",
+      "cautions": ["..."]
     }
   ],
   "products": [
     {
-      "name": "SoonJung 2x Barrier Intensive Cream",
-      "brand": "Etude",
-      "category": "Moisturizer",
-      "why": "Supports barrier repair and reduces irritation load.",
-      "howToUse": "Use after treatment steps, especially on barrier nights.",
-      "cautions": [
-        "Reduce frequency of actives if burning develops."
-      ],
-      "tags": [
-        "barrier",
-        "fragrance-free"
-      ]
+      "name": "...",
+      "brand": "...",
+      "category": "Serum",
+      "why": "...",
+      "howToUse": "...",
+      "cautions": ["..."],
+      "tags": ["..."]
     }
   ],
   "routine": {
-    "AM": [
-      "Cleanser - daily - use a gentle wash if skin feels oily on waking",
-      "Serum - every other morning - use azelaic acid if skin is calm",
-      "Moisturizer - daily - use a thin layer if skin feels balanced",
-      "Sunscreen - daily - final morning step"
+    "AM": ["..."],
+    "PM": ["..."],
+    "weekly": ["..."]
+  },
+  "conflicts": [
+    {
+      "ingredients": ["...", "..."],
+      "warning": "..."
+    }
+  ],
+  "disclaimers": ["..."],
+  "timestamp": "2026-03-22T14:00:00.000Z"
+}
+```
+
+### Runtime Validation
+
+The API enforces runtime schema validation with Zod:
+
+```ts
+const result = skinAnalysisResponseSchema.safeParse(modelOutput);
+
+if (!result.success) {
+  // return safe fallback response
+}
+```
+
+This prevents malformed raw model output from being treated as trustworthy application data.
+
+## 🛡️ Trust & Reliability
+
+SkinAI includes multiple reliability layers:
+
+### Confidence Signal
+
+The current confidence signal is exposed as `skinType.confidence`.
+
+This is heuristic model confidence, not a calibrated medical probability. It exists to:
+
+- communicate uncertainty
+- avoid falsely authoritative UX
+- create room for future calibration work
+
+### How Hallucinations Are Reduced
+
+Hallucination reduction is handled systemically:
+
+- retrieval grounds generation in prior context
+- prompt constraints force deterministic structure
+- schema validation rejects malformed outputs
+- preference compliance checks catch obvious unsafe content
+- fallback behavior prevents brittle failures
+
+### Safe Fallback Behavior
+
+The system never relies on a happy path only.
+
+Handled explicitly:
+
+- retrieval returns empty or irrelevant results
+  - proceed with base prompt only
+- model returns malformed JSON
+  - retry once with stricter JSON-only instruction
+- schema validation fails
+  - return a safe structured fallback response
+- preference compliance fails
+  - sanitize where possible and annotate with disclaimers
+- unexpected runtime errors in generation
+  - return a low-confidence fallback analysis instead of crashing the AI stage
+
+### Safe Default Response
+
+If the model cannot produce a reliable analysis, the backend can return a structured fallback instead of failing the request:
+
+```json
+{
+  "skinType": {
+    "type": "Sensitive-leaning",
+    "confidence": 0.35
+  },
+  "explanation": {
+    "skinTypeExplanation": "The system could not confidently generate a full analysis, so this fallback response prioritizes a simple, lower-risk routine.",
+    "productBenefits": [
+      "The fallback plan focuses on gentle cleansing, moisturizer, and sunscreen to reduce the chance of over-treatment.",
+      "The fallback avoids making aggressive claims about specific visible concerns."
     ],
-    "PM": [
-      "Cleanser - daily - remove sunscreen and surface oil",
-      "Treatment serum - 2x-week to start - skip if stinging",
-      "Moisturizer - daily - barrier-support final step"
-    ],
-    "weekly": [
-      "Daily base (AM): cleanse, azelaic acid when tolerated, moisturize, sunscreen",
-      "Daily base (PM): cleanse, treatment only on scheduled nights, moisturize",
-      "Active cycle (Mon–Sun): Mon treatment | Tue barrier | Wed barrier | Thu treatment | Fri barrier | Sat barrier | Sun barrier",
-      "Ramp-up (4 weeks): Weeks 1–2 once weekly; Weeks 3–4 twice weekly if calm; Maintenance based on tolerance",
-      "Rules: pause actives and return to cleanser + moisturizer only if irritation rises"
+    "layeringGuide": [
+      "Use cleanser first, then treatment only if specifically tolerated, then moisturizer.",
+      "Keep the routine simple until a higher-confidence analysis is available.",
+      "Finish every morning with sunscreen as the final layer."
     ]
+  },
+  "concerns": [],
+  "ingredients": [],
+  "products": [],
+  "routine": {
+    "AM": ["gentle cleanser", "moisturizer", "SPF"],
+    "PM": ["gentle cleanser", "moisturizer"],
+    "weekly": ["keep the routine simple until a stronger analysis is available"]
   },
   "conflicts": [],
   "disclaimers": [
-    "Fragrance-free mode was applied.",
-    "This routine is educational and not medical advice."
+    "Unable to confidently analyze input.",
+    "This is not medical advice."
   ],
   "timestamp": "2026-03-22T14:00:00.000Z"
 }
 ```
 
-### Human-Readable Interpretation
+### Non-Medical Scope
 
-This user likely has combination, breakout-prone skin with redness and post-inflammatory marks. The system recommends a lower-irritation routine built around barrier support and azelaic acid, keeps the weekly schedule conservative because `sensitiveMode` is enabled, and filters recommendations through a best-value preference instead of defaulting to the cheapest products.
-
-## How It Works
-
-### AI Pipeline
-
-1. User uploads a face photo and selects optional preferences.
-2. Backend validates the upload and preprocesses the image.
-3. The system generates a structured visual description of the skin.
-4. That description is embedded into a vector.
-5. Pinecone retrieval returns related prior analysis context when available.
-6. Prompt construction merges image findings, retrieval context, and user preferences.
-7. OpenAI returns structured JSON.
-8. Backend parses, validates, normalizes, and sanitizes the result.
-9. Frontend renders both structured output and a human explanation layer.
+SkinAI is not a medical diagnostic system. It only reasons about visible skincare-relevant traits and returns skincare guidance, not clinical diagnosis.
 
 ## 🧠 Design Decisions
 
 ### Why RAG Instead of Fine-Tuning?
 
-- easier to iterate on than a custom fine-tuned model
-- allows lightweight grounding using retrieved prior analyses
-- keeps the system adaptable as product catalog or skincare logic changes
+RAG is a better fit here because:
 
-System design tradeoff:
+- retrieval is easier to iterate on than a custom fine-tune
+- context can evolve without retraining a model
+- recommendations stay connected to a retrieval corpus rather than a frozen tuning snapshot
 
-- RAG adds retrieval latency and infrastructure complexity
-- fine-tuning could reduce prompt size, but would be slower to iterate on and harder to keep aligned with changing product logic
+Tradeoff:
 
-For this product stage, retrieval provides a better reliability-to-complexity tradeoff.
+- retrieval adds latency and infrastructure complexity
+- but improves grounding and product extensibility
 
-### Why Structured Output?
+### Why Structured Outputs Instead of Free Text?
 
-- frontend rendering becomes deterministic
-- validation becomes possible
-- recommendations can be audited
-- reviewers can inspect concrete system contracts
+Structured outputs make the system:
 
-System design tradeoff:
+- renderable
+- testable
+- auditable
+- safer to validate
 
-- structured output is more constraining than free-form text
-- the prompt must work harder to keep responses rich and natural
+Tradeoff:
 
-That tradeoff is worthwhile because production systems need contracts, not just eloquent responses.
+- the prompt must be more constrained
+- but the result is significantly more production-ready
 
-### Why a Validation Layer?
+### Why Validation Exists
 
-- LLMs are probabilistic
-- model output can be malformed or incomplete
-- user safety preferences should not rely on prompt obedience alone
+LLMs are probabilistic. The validation layer exists because:
 
-System design tradeoff:
+- raw model output is not a contract
+- formatting drift can break the UI
+- safety preferences should not rely on prompt obedience alone
 
-- validation logic adds implementation complexity
-- some imperfect outputs need normalization or sanitization
+Tradeoff:
 
-That complexity is deliberate. It is what turns an interesting demo into a more reliable AI product.
-
-### Why Fallback Instead of Hard Failure?
-
-- a partially sanitized result is often better UX than a 500
-- reliability matters more than perfect prose
-- portfolio projects look stronger when failure handling is explicit
+- validation adds engineering work
+- but converts a demo into a system
 
 ### Latency vs Reliability
 
-The system makes explicit tradeoffs between speed and robustness:
+This project deliberately accepts some latency to improve reliability:
 
-- image preprocessing adds work, but improves model input consistency
-- retrieval adds cost, but improves grounding
-- schema validation adds engineering complexity, but prevents malformed output from leaking into the UI
-- fallback handling favors returning a safe, structured response over failing the request
+- preprocessing stabilizes images
+- retrieval improves grounding
+- validation prevents malformed outputs
+- fallback handling avoids brittle request failures
 
-This is the core design philosophy of the project: controlled reliability over naive speed.
+The system also avoids unnecessary retries:
 
-## Tech Stack
+- quality misses do not trigger extra generation calls
+- only malformed JSON gets a repair retry
 
-### Frontend
+That keeps reliability high without letting token cost scale unnecessarily.
 
-- React 19
-- Vite / Rolldown-Vite
-- TypeScript
-- React Router
-
-### Backend
-
-- Node.js
-- Express
-- TypeScript
-- OpenAI API
-- Sharp for image preprocessing
-- Multer for multipart uploads
-
-### Retrieval / Data
-
-- Pinecone for vector search
-- MongoDB / Mongoose for optional analysis logging
-
-### Shared Contracts
-
-- workspace-based monorepo
-- shared TypeScript schema in `packages/shared-types`
-
-## Running Locally
-
-### Prerequisites
-
-- Node.js 18+
-- npm 9+
-- OpenAI API key
-- optional MongoDB instance
-- optional Pinecone index + API key
+## ⚡ How to Run
 
 ### Install
 
 ```bash
 npm install
 ```
+
+### Start
+
+```bash
+npm run dev
+```
+
+Endpoints:
+
+- frontend: `http://localhost:5173`
+- API: `http://localhost:3000`
 
 ### Environment
 
@@ -799,62 +565,118 @@ SKIP_DB=true
 
 The API loads `apps/api/.env` first and falls back to the repo-root `.env` if present.
 
-### Start the System
+### Example Request
 
 ```bash
-npm run dev
+curl -X POST http://localhost:3000/api/skin/analyze \
+  -F "image=@./example-face.jpg" \
+  -F "goals=reduce acne marks and calm redness" \
+  -F "age=29" \
+  -F "valueFocus=best_value" \
+  -F "fragranceFree=true" \
+  -F "pregnancySafe=false" \
+  -F "sensitiveMode=true"
 ```
 
-Endpoints:
+### Example Response
 
-- frontend: `http://localhost:5173`
-- API: `http://localhost:3000`
-
-### Validation / Build
-
-```bash
-npm run type-check
-npm run build
-npm test
+```json
+{
+  "success": true,
+  "data": {
+    "skinType": {
+      "type": "Combination / Acne-prone",
+      "confidence": 0.82
+    },
+    "explanation": {
+      "skinTypeExplanation": "...",
+      "productBenefits": ["..."],
+      "layeringGuide": ["..."]
+    },
+    "concerns": [],
+    "ingredients": [],
+    "products": [],
+    "routine": {
+      "AM": ["..."],
+      "PM": ["..."],
+      "weekly": ["..."]
+    },
+    "conflicts": [],
+    "disclaimers": [
+      "This routine is educational and not medical advice."
+    ],
+    "timestamp": "2026-03-22T14:00:00.000Z"
+  }
+}
 ```
 
-## API
+## Observability
 
-### `GET /api/health`
+The API emits lightweight logs for operational clarity:
 
-Returns service health information.
+- retrieved chunk count
+- prompt preview (truncated)
+- schema validation success / failure
+- fallback triggers
 
-### `POST /api/skin/analyze`
+This keeps the system debuggable without introducing heavy observability tooling.
 
-Multipart form-data:
+## Folder Structure
 
-- `image` required
-- `goals` optional
-- `age` optional
-- `valueFocus` optional
-- `fragranceFree` optional
-- `pregnancySafe` optional
-- `sensitiveMode` optional
+```text
+apps/api/src
+├── config
+├── controllers
+├── middleware
+├── models
+├── routes
+├── services
+├── utils
+└── validation
 
-## Future Improvements
+apps/web/src
+├── components
+├── pages
+├── services
+└── styles
 
-- stronger product catalog grounding with normalized brand / ingredient metadata
-- evaluation harness for prompt quality and safety regression testing
-- richer confidence scoring backed by calibration heuristics
-- explainable retrieval traces in the API response
-- product availability / pricing integration for real value-aware ranking
-- clinician review mode or escalation path for higher-risk visual patterns
-- anonymized offline benchmark set for pipeline evaluation
+packages/shared-types
+packages/utils
+```
 
-## Portfolio Value
+## Tech Stack
 
-SkinAI demonstrates:
+### Frontend
 
-- multimodal prompt engineering
+- React 19
+- Vite / Rolldown-Vite
+- TypeScript
+- React Router
+
+### Backend
+
+- Node.js
+- Express
+- TypeScript
+- OpenAI API
+- Sharp
+- Multer
+- Zod
+
+### Retrieval / Data
+
+- Pinecone
+- MongoDB / Mongoose
+
+## Why This Repo Stands Out
+
+This repository demonstrates:
+
+- structured AI pipeline design
+- schema-validated outputs
 - retrieval-augmented generation
-- structured output contracts
-- post-generation validation and compliance handling
-- product-oriented safety and reliability design
-- full-stack implementation with shared schemas
+- safety-aware fallback handling
+- product-oriented explanation design
+- clear separation between inference, retrieval, validation, and UI rendering
 
-This is the kind of project that signals AI systems thinking, not just familiarity with model APIs.
+It is designed to read like a production-minded AI system, not a one-prompt demo.
