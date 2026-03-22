@@ -42,15 +42,21 @@ function SkinResult() {
   const { analysis, imageDataUrl } = state;
 
   return (
-    <div className="result-container">
+    <main className="result-container">
       <h1 className="title">SkinAI Results</h1>
 
       <div className="topRow">
         <div className="photoCard">
           {imageDataUrl ? (
-            <img src={imageDataUrl} alt="uploaded face" className="photo" />
+            <img
+              src={imageDataUrl}
+              alt="Uploaded face photo used for skin analysis"
+              className="photo"
+            />
           ) : (
-            <div className="muted">Original photo preview unavailable.</div>
+            <div className="muted" role="status" aria-live="polite">
+              Original photo preview unavailable.
+            </div>
           )}
         </div>
 
@@ -167,7 +173,7 @@ function SkinResult() {
       <button className="start-over-btn" onClick={() => navigate("/")}>
         Analyze Another Photo
       </button>
-    </div>
+    </main>
   );
 }
 

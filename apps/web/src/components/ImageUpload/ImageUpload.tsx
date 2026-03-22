@@ -206,10 +206,11 @@ export const ImageUpload: React.FC<Props> = ({
   };
 
   return (
-    <div
+    <section
       className="image-upload-container"
       onDragOver={handleDragOver}
       onDrop={handleDrop}
+      aria-label="Photo upload"
     >
       {/* Mobile camera hint input */}
       <input
@@ -218,6 +219,7 @@ export const ImageUpload: React.FC<Props> = ({
         accept="image/*"
         capture="environment"
         hidden
+        aria-label="Take a photo with your mobile camera"
         onChange={onCameraChange}
       />
 
@@ -227,6 +229,7 @@ export const ImageUpload: React.FC<Props> = ({
         type="file"
         accept="image/*"
         hidden
+        aria-label="Choose a photo from your library"
         onChange={onLibraryChange}
       />
 
@@ -240,6 +243,7 @@ export const ImageUpload: React.FC<Props> = ({
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") openLibrary();
             }}
+            aria-label="Upload a face photo by choosing a file"
             style={{
               width: "100%",
               maxWidth: 520,
@@ -278,7 +282,11 @@ export const ImageUpload: React.FC<Props> = ({
           </div>
 
           {webcamError && (
-            <div style={{ marginTop: "0.75rem", color: "#b91c1c" }}>
+            <div
+              role="alert"
+              aria-live="assertive"
+              style={{ marginTop: "0.75rem", color: "#b91c1c" }}
+            >
               {webcamError}
             </div>
           )}
@@ -300,6 +308,7 @@ export const ImageUpload: React.FC<Props> = ({
                 autoPlay
                 playsInline
                 muted
+                aria-label="Live webcam preview"
                 style={{
                   width: "100%",
                   borderRadius: "10px",
@@ -307,10 +316,18 @@ export const ImageUpload: React.FC<Props> = ({
                 }}
               />
               <div style={{ display: "flex", gap: "0.5rem" }}>
-                <button type="button" onClick={captureFromWebcam}>
+                <button
+                  type="button"
+                  onClick={captureFromWebcam}
+                  aria-label="Capture photo from webcam"
+                >
                   Capture
                 </button>
-                <button type="button" onClick={stopWebcam}>
+                <button
+                  type="button"
+                  onClick={stopWebcam}
+                  aria-label="Cancel webcam capture"
+                >
                   Cancel
                 </button>
               </div>
@@ -322,7 +339,11 @@ export const ImageUpload: React.FC<Props> = ({
         </div>
       ) : (
         <div className="image-upload-preview-wrapper">
-          <img src={preview} className="image-upload-preview" alt="preview" />
+          <img
+            src={preview}
+            className="image-upload-preview"
+            alt="Selected photo preview"
+          />
           <div
             style={{
               marginTop: "0.75rem",
@@ -344,6 +365,7 @@ export const ImageUpload: React.FC<Props> = ({
             <button
               type="button"
               onClick={handleRemove}
+              aria-label="Remove selected photo"
               style={{ backgroundColor: "#e02424", color: "white" }}
             >
               Remove
@@ -351,6 +373,6 @@ export const ImageUpload: React.FC<Props> = ({
           </div>
         </div>
       )}
-    </div>
+    </section>
   );
 };

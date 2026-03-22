@@ -3,8 +3,13 @@ import styles from "./SkinAnalysisLoader.module.css";
 
 const SkinAnalysisLoader: React.FC = () => {
   return (
-    <div className={styles.loaderContainer}>
-      <div className={styles.loader}>
+    <div
+      className={styles.loaderContainer}
+      role="status"
+      aria-live="polite"
+      aria-label="Analyzing your skin and building a routine"
+    >
+      <div className={styles.loader} aria-hidden="true">
         <span></span>
         <span></span>
         <span></span>

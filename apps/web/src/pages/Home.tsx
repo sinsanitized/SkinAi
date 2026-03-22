@@ -66,7 +66,7 @@ function Home() {
   };
 
   return (
-    <div className="home-container">
+    <main className="home-container">
       <h1 className="title">SkinAI 🧴</h1>
 
       {loading ? (
@@ -79,8 +79,11 @@ function Home() {
           />
 
           <div className="context-box">
-            <label className="context-label">Goals (optional)</label>
+            <label className="context-label" htmlFor="skin-goals">
+              Goals (optional)
+            </label>
             <input
+              id="skin-goals"
               type="text"
               className="context-input"
               placeholder='e.g. "acne + dark spots", "redness", "oil control"'
@@ -96,8 +99,9 @@ function Home() {
 
           <div className="prefs-grid">
             <div className="pref">
-              <label>Age</label>
+              <label htmlFor="skin-age">Age</label>
               <input
+                id="skin-age"
                 type="number"
                 min={10}
                 max={90}
@@ -117,8 +121,9 @@ function Home() {
             </div>
 
             <div className="pref">
-              <label>Value focus</label>
+              <label htmlFor="value-focus">Value focus</label>
               <select
+                id="value-focus"
                 value={analysisOptions.valueFocus || "best_value"}
                 onChange={(e) =>
                   setAnalysisOptions((currentOptions) => ({
@@ -178,12 +183,17 @@ function Home() {
             </label>
           </div>
 
-          <button className="continue-btn" onClick={handleAnalyze}>
+          <button
+            type="button"
+            className="continue-btn"
+            onClick={handleAnalyze}
+            aria-label="Analyze uploaded skin photo"
+          >
             Analyze Skin
           </button>
         </>
       )}
-    </div>
+    </main>
   );
 }
 
