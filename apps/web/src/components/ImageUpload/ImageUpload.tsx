@@ -11,6 +11,7 @@ export const ImageUpload: React.FC<Props> = ({
   onRemove,
 }) => {
   const [preview, setPreview] = useState<string | null>(null);
+  const [prefersNativeCamera, setPrefersNativeCamera] = useState(false);
 
   // webcam UI state
   const [showWebcam, setShowWebcam] = useState(false);
@@ -30,6 +31,27 @@ export const ImageUpload: React.FC<Props> = ({
       stopWebcam();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+
+    const mediaQuery = window.matchMedia(
+      "(pointer: coarse), (max-width: 820px)"
+    );
+    const updatePreference = () => {
+      setPrefersNativeCamera(mediaQuery.matches);
+    };
+
+    updatePreference();
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", updatePreference);
+      return () => mediaQuery.removeEventListener("change", updatePreference);
+    }
+
+    mediaQuery.addListener(updatePreference);
+    return () => mediaQuery.removeListener(updatePreference);
   }, []);
 
   const setPreviewFromFile = (file: File) => {
@@ -59,6 +81,14 @@ export const ImageUpload: React.FC<Props> = ({
 
   const openMobileCamera = () => cameraInputRef.current?.click();
   const openLibrary = () => libraryInputRef.current?.click();
+  const openPrimaryCamera = () => {
+    if (prefersNativeCamera) {
+      openMobileCamera();
+      return;
+    }
+
+    void startWebcam();
+  };
 
   // Drag & drop
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -247,25 +277,23 @@ export const ImageUpload: React.FC<Props> = ({
           >
             <strong>Upload a clear face photo</strong>
             <p className="image-upload-copy">
-              Drag and drop on desktop or tap to choose from your device.
+              Drag and drop on desktop or use your camera or photo library.
             </p>
           </div>
 
           <div className="image-upload-actions">
             <button
               type="button"
-              onClick={openLibrary}
+              onClick={openPrimaryCamera}
               className="image-upload-primary"
+              aria-label="Open camera"
             >
-              Choose Photo
+              Open Camera
             </button>
 
             <div className="image-upload-secondary-actions">
-              <button type="button" onClick={openMobileCamera}>
-                Take Photo (Mobile)
-              </button>
-              <button type="button" onClick={startWebcam}>
-                Use Webcam (Desktop)
+              <button type="button" onClick={openLibrary}>
+                Choose From Library
               </button>
             </div>
           </div>
@@ -319,11 +347,8 @@ export const ImageUpload: React.FC<Props> = ({
             <button type="button" onClick={openLibrary}>
               Replace Photo
             </button>
-            <button type="button" onClick={openMobileCamera}>
-              Retake on Mobile
-            </button>
-            <button type="button" onClick={startWebcam}>
-              Retake with Webcam
+            <button type="button" onClick={openPrimaryCamera}>
+              Open Camera
             </button>
             <button
               type="button"
