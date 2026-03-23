@@ -37,7 +37,7 @@ function Home() {
   const location = useLocation();
   const locationState = location.state as HomeLocationState | null;
   const [analysisOptions, setAnalysisOptions] = useState<SkinAnalysisRequest>(
-    locationState?.draftOptions ?? DEFAULT_ANALYSIS_OPTIONS
+    locationState?.draftOptions ?? DEFAULT_ANALYSIS_OPTIONS,
   );
 
   const handleAnalyze = async () => {
@@ -55,7 +55,7 @@ function Home() {
           analysis,
           analysisOptions,
           imageDataUrl,
-        })
+        }),
       );
 
       setLoading(false);
@@ -82,7 +82,7 @@ function Home() {
         <p className="heroCopy">
           {loading
             ? "Reviewing your photo, matching it to the visible skin signals, and preparing a routine you can actually follow."
-            : "Upload a clear face photo, add any concerns that matter to you, and get a cleaner routine breakdown instead of raw AI output."}
+            : "Upload a clear face photo, add any concerns that matter to you, and get Skincare Routine."}
         </p>
       </section>
 

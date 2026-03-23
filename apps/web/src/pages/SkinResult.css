@@ -32,11 +32,39 @@
 .photoCard,
 .summaryCard,
 .card {
+  position: relative;
+  overflow: hidden;
   background: var(--surface-card);
   border: 1px solid var(--border-soft);
   border-radius: 24px;
   padding: 1.2rem;
   box-shadow: 0 18px 32px var(--shadow-soft);
+  transition: transform 0.22s ease, box-shadow 0.22s ease,
+    border-color 0.22s ease;
+}
+
+.photoCard::before,
+.summaryCard::before,
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 100%;
+  height: 72px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-pill) 45%, transparent),
+    transparent
+  );
+  pointer-events: none;
+}
+
+.photoCard:hover,
+.summaryCard:hover,
+.card:hover {
+  transform: translateY(-3px);
+  border-color: var(--border-strong);
+  box-shadow: 0 22px 38px var(--shadow-strong);
 }
 
 .photo {
@@ -73,6 +101,7 @@
 
 .summaryCard h2,
 .card h2 {
+  position: relative;
   margin-bottom: 0.85rem;
   font-size: 1.1rem;
   color: var(--text-primary);
@@ -187,6 +216,7 @@
   border-radius: 18px;
   background: color-mix(in srgb, var(--surface-input-soft) 86%, transparent);
   border: 1px solid var(--border-soft);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .explanationSection h3 {

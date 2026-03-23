@@ -1,3 +1,4 @@
+import { motion, useReducedMotion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import type {
   IngredientConflict,
@@ -77,20 +78,56 @@ function SkinResult() {
   const confidence = getConfidenceMeta(analysis.skinType.confidence);
   const primaryConcern = analysis.concerns?.[0];
   const fallbackAnalysis = isFallbackAnalysis(analysis);
+  const shouldReduceMotion = useReducedMotion();
+
+  const stackVariants = {
+    hidden: {},
+    visible: {
+      transition: {
+        staggerChildren: shouldReduceMotion ? 0 : 0.08,
+        delayChildren: shouldReduceMotion ? 0 : 0.04,
+      },
+    },
+  };
+
+  const cardVariants = {
+    hidden: shouldReduceMotion
+      ? { opacity: 0 }
+      : { opacity: 0, y: 22, scale: 0.985 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      scale: 1,
+      transition: {
+        duration: shouldReduceMotion ? 0.18 : 0.42,
+        ease: [0.22, 1, 0.36, 1] as const,
+      },
+    },
+  };
 
   return (
-    <main className="result-container">
+    <motion.main
+      className="result-container"
+      initial="hidden"
+      animate="visible"
+      variants={stackVariants}
+    >
       <h1 className="title">SkinAI Results</h1>
 
       {fallbackAnalysis ? (
-        <div className="warningBanner" role="alert" aria-live="polite">
+        <motion.div
+          className="warningBanner"
+          role="alert"
+          aria-live="polite"
+          variants={cardVariants}
+        >
           ⚠️ We couldn&apos;t confidently analyze your input. Try adding more
           detail.
-        </div>
+        </motion.div>
       ) : null}
 
-      <div className="topRow">
-        <div className="photoCard">
+      <motion.div className="topRow" variants={stackVariants}>
+        <motion.div className="photoCard" variants={cardVariants}>
           {imageDataUrl ? (
             <img
               src={imageDataUrl}
@@ -102,9 +139,9 @@ function SkinResult() {
               Original photo preview unavailable.
             </div>
           )}
-        </div>
+        </motion.div>
 
-        <div className="summaryCard">
+        <motion.div className="summaryCard" variants={cardVariants}>
           <h2>🧴 Skin Analysis</h2>
           <div className="summaryStack">
             <div className="summaryItem">
@@ -135,23 +172,24 @@ function SkinResult() {
               </div>
             ))}
           </div>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
 
-      <div className="grid">
+      <motion.div className="grid" variants={stackVariants}>
         {explanation ? (
-          <section
+          <motion.section
             className="card cardWide"
             aria-labelledby="skin-explanation-heading"
+            variants={cardVariants}
           >
             <h2 id="skin-explanation-heading">🧠 Why this recommendation</h2>
             <div className="explanationGrid">
-              <div className="explanationSection">
+              <motion.div className="explanationSection" variants={cardVariants}>
                 <h3>What your skin type means</h3>
                 <p className="itemBody">{explanation.skinTypeExplanation}</p>
-              </div>
+              </motion.div>
 
-              <div className="explanationSection">
+              <motion.div className="explanationSection" variants={cardVariants}>
                 <h3>How the products help</h3>
                 <ul className="list">
                   {explanation.productBenefits.map((benefit: string, i: number) => (
@@ -160,21 +198,21 @@ function SkinResult() {
                     </li>
                   ))}
                 </ul>
-              </div>
+              </motion.div>
 
-              <div className="explanationSection">
+              <motion.div className="explanationSection" variants={cardVariants}>
                 <h3>How to stack the routine</h3>
                 <ol className="stackingList">
                   {explanation.layeringGuide.map((step: string, i: number) => (
                     <li key={i}>{step}</li>
                   ))}
                 </ol>
-              </div>
+              </motion.div>
             </div>
-          </section>
+          </motion.section>
         ) : null}
 
-        <div className="card">
+        <motion.div className="card" variants={cardVariants}>
           <h2>🌞 Morning Routine</h2>
           <div className="routineBlock">
             <ol>
@@ -183,9 +221,9 @@ function SkinResult() {
               ))}
             </ol>
           </div>
-        </div>
+        </motion.div>
 
-        <div className="card">
+        <motion.div className="card" variants={cardVariants}>
           <h2>🌙 Night Routine</h2>
           <div className="routineBlock">
             <ol>
@@ -205,9 +243,9 @@ function SkinResult() {
               </ul>
             </div>
           ) : null}
-        </div>
+        </motion.div>
 
-        <div className="card">
+        <motion.div className="card" variants={cardVariants}>
           <h2>🧪 Key Ingredients</h2>
           <ul className="list">
             {analysis.ingredients?.map((ingredient: IngredientRecommendation, i: number) => (
@@ -222,9 +260,9 @@ function SkinResult() {
               </li>
             ))}
           </ul>
-        </div>
+        </motion.div>
 
-        <div className="card cardWide">
+        <motion.div className="card cardWide" variants={cardVariants}>
           <h2>🛍️ Product Picks</h2>
           <ul className="list">
             {analysis.products?.slice(0, 10).map((product: ProductRecommendation, i: number) => (
@@ -246,9 +284,9 @@ function SkinResult() {
               </li>
             ))}
           </ul>
-        </div>
+        </motion.div>
 
-        <div className="card">
+        <motion.div className="card" variants={cardVariants}>
           <h2>⚠️ Conflicts & Warnings</h2>
           {analysis.conflicts?.length ? (
             <ul className="list">
@@ -273,10 +311,10 @@ function SkinResult() {
               </li>
             ))}
           </ul>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
 
-      <div className="resultActions">
+      <motion.div className="resultActions" variants={cardVariants}>
         <button
           className="start-over-btn"
           onClick={() =>
@@ -288,8 +326,8 @@ function SkinResult() {
         <button className="secondary-btn" onClick={() => navigate("/")}>
           Analyze Another Photo
         </button>
-      </div>
-    </main>
+      </motion.div>
+    </motion.main>
   );
 }
 
