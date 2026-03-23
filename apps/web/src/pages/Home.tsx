@@ -80,8 +80,9 @@ function Home() {
         <p className="eyebrow">Structured skincare guidance</p>
         <h1 className="title">SkinAI 🧴</h1>
         <p className="heroCopy">
-          Upload a clear face photo, add any concerns that matter to you, and
-          get a cleaner routine breakdown instead of raw AI output.
+          {loading
+            ? "Reviewing your photo, matching it to the visible skin signals, and preparing a routine you can actually follow."
+            : "Upload a clear face photo, add any concerns that matter to you, and get a cleaner routine breakdown instead of raw AI output."}
         </p>
       </section>
 
