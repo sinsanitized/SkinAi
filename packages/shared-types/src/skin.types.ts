@@ -89,6 +89,8 @@ export type ValueFocus =
   | "midrange_worth_it"
   | "splurge_if_unique";
 
+export type RoutineIntensity = "minimal" | "balanced" | "more_active";
+
 export interface SkinAnalysisRequest {
   // image is sent as multipart/form-data; these are optional form fields
   goals?: string; // e.g. "acne + dark spots"
@@ -98,6 +100,9 @@ export interface SkinAnalysisRequest {
 
   // NEW: replaces budget
   valueFocus?: ValueFocus;
+
+  // Controls how lean or active the generated routine should be.
+  routineIntensity?: RoutineIntensity;
 
   fragranceFree?: boolean;
   pregnancySafe?: boolean;

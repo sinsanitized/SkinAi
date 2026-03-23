@@ -1,5 +1,6 @@
 import type {
   ApiResponse,
+  RoutineIntensity,
   SkinAnalysisRequest,
   SkinAnalysisResponse,
   ValueFocus,
@@ -29,6 +30,13 @@ export class SkinAnalysisApi {
       formData.append(
         "valueFocus",
         analysisOptions.valueFocus satisfies ValueFocus
+      );
+    }
+
+    if (analysisOptions.routineIntensity) {
+      formData.append(
+        "routineIntensity",
+        analysisOptions.routineIntensity satisfies RoutineIntensity
       );
     }
 

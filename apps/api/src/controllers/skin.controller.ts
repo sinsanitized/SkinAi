@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import type {
   ApiResponse,
+  RoutineIntensity,
   SkinAnalysisResponse,
   SkinAnalysisRequest,
   SkinConcern,
@@ -15,6 +16,12 @@ const VALID_VALUE_FOCUS = new Set<ValueFocus>([
   "best_value",
   "midrange_worth_it",
   "splurge_if_unique",
+]);
+
+const VALID_ROUTINE_INTENSITY = new Set<RoutineIntensity>([
+  "minimal",
+  "balanced",
+  "more_active",
 ]);
 
 export class SkinController {
@@ -65,6 +72,23 @@ export class SkinController {
       }
       const valueFocus = valueFocusRaw as ValueFocus;
 
+      const routineIntensityRaw = String(
+        req.body.routineIntensity ?? "balanced"
+      );
+      if (
+        !VALID_ROUTINE_INTENSITY.has(
+          routineIntensityRaw as RoutineIntensity
+        )
+      ) {
+        res.status(400).json({
+          success: false,
+          error:
+            "Invalid routine intensity. Use minimal, balanced, or more_active",
+        } as ApiResponse<never>);
+        return;
+      }
+      const routineIntensity = routineIntensityRaw as RoutineIntensity;
+
       const fragranceFree = req.body.fragranceFree === "true";
       const pregnancySafe = req.body.pregnancySafe === "true";
       const sensitiveMode = req.body.sensitiveMode === "true";
@@ -105,6 +129,7 @@ export class SkinController {
         goals,
         age,
         valueFocus,
+        routineIntensity,
         fragranceFree,
         pregnancySafe,
         sensitiveMode,
@@ -132,6 +157,7 @@ export class SkinController {
               goals,
               age,
               valueFocus,
+              routineIntensity,
               fragranceFree,
               pregnancySafe,
               sensitiveMode,

@@ -3,7 +3,11 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { ImageUpload } from "../components/ImageUpload/ImageUpload";
 import SkinAnalysisLoader from "../components/SkinAnalysisLoader/SkinAnalysisLoader";
 import { skinAnalysisApi } from "../services/skinAnalysisApi";
-import type { SkinAnalysisRequest, ValueFocus } from "@skinai/shared-types";
+import type {
+  RoutineIntensity,
+  SkinAnalysisRequest,
+  ValueFocus,
+} from "@skinai/shared-types";
 import "./Home.css";
 
 const RESULT_STORAGE_KEY = "skinai:last-result";
@@ -11,6 +15,7 @@ const DEFAULT_ANALYSIS_OPTIONS: SkinAnalysisRequest = {
   goals: "",
   age: 38,
   valueFocus: "best_value",
+  routineIntensity: "balanced",
   fragranceFree: false,
   pregnancySafe: false,
   sensitiveMode: false,
@@ -170,6 +175,24 @@ function Home() {
                     <option value="splurge_if_unique">
                       Splurge only if unique
                     </option>
+                  </select>
+                </div>
+
+                <div className="pref">
+                  <label htmlFor="routine-intensity">Routine intensity</label>
+                  <select
+                    id="routine-intensity"
+                    value={analysisOptions.routineIntensity || "balanced"}
+                    onChange={(e) =>
+                      setAnalysisOptions((currentOptions) => ({
+                        ...currentOptions,
+                        routineIntensity: e.target.value as RoutineIntensity,
+                      }))
+                    }
+                  >
+                    <option value="minimal">Minimal</option>
+                    <option value="balanced">Balanced</option>
+                    <option value="more_active">More active</option>
                   </select>
                 </div>
 

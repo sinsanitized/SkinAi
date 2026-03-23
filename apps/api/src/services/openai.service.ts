@@ -1,5 +1,6 @@
 import { getOpenAIClient } from "../config/openai";
 import type {
+  RoutineIntensity,
   SkinAnalysisResponse,
   SkinAnalysisRequest,
   ValueFocus,
@@ -30,6 +31,12 @@ const VALID_VALUE_FOCUS = new Set<ValueFocus>([
   "best_value",
   "midrange_worth_it",
   "splurge_if_unique",
+]);
+
+const VALID_ROUTINE_INTENSITY = new Set<RoutineIntensity>([
+  "minimal",
+  "balanced",
+  "more_active",
 ]);
 
 function containsAnyTerm(text: string, terms: readonly string[]): boolean {
@@ -89,6 +96,7 @@ export class OpenAIService {
       goals: string;
       age?: number;
       valueFocus: ValueFocus;
+      routineIntensity: RoutineIntensity;
       fragranceFree: boolean;
       pregnancySafe: boolean;
       sensitiveMode: boolean;
@@ -203,6 +211,7 @@ export class OpenAIService {
     prefs: {
       age?: number;
       valueFocus: ValueFocus;
+      routineIntensity: RoutineIntensity;
       fragranceFree: boolean;
       pregnancySafe: boolean;
       sensitiveMode: boolean;
@@ -395,6 +404,7 @@ If something is not clearly visible, explicitly say that.
       goals: string;
       age?: number;
       valueFocus: "best_value" | "midrange_worth_it" | "splurge_if_unique";
+      routineIntensity: "minimal" | "balanced" | "more_active";
       fragranceFree: boolean;
       pregnancySafe: boolean;
       sensitiveMode: boolean;
@@ -425,6 +435,9 @@ USER CONTEXT (must be respected):
 - valueFocus: "${
       userPreferences.valueFocus
     }" (optimize for *worth it* / best value — NOT just cheapest)
+- routineIntensity: "${
+      userPreferences.routineIntensity
+    }" (minimal = fewer steps and slower ramp; balanced = default; more_active = fuller routine and more treatment detail if tolerated)
 - fragranceFree: ${
       userPreferences.fragranceFree
     } (if true, recommend only fragrance-free products and avoid parfum, fragrance, and essential oils; do not include products with unknown fragrance status)
@@ -454,10 +467,17 @@ Use age to tailor intensity + focus:
 - Generally: younger skin often needs simpler acne/oil control + barrier support; older skin may benefit more from pigmentation support, barrier support, and consistent retinoid use (unless pregnancySafe).
 - Always prioritize tolerance and safe ramp-up.
 
+ROUTINE INTENSITY GUIDANCE (CRITICAL):
+- If routineIntensity=minimal, keep the routine lean, reduce optional steps, use fewer treatment nights, and prefer easier-to-follow structure.
+- If routineIntensity=balanced, use the default level of detail and treatment frequency.
+- If routineIntensity=more_active, you may use a fuller routine and more treatment detail, but only when the visible skin and safety flags support it.
+- sensitiveMode=true always overrides routineIntensity when there is a conflict; stay gentler.
+
 QUALITY RULES (IMPORTANT):
 1) Routine MUST feel tailored to observed issues. Do NOT output generic routines.
 2) AM routine must have 5–7 steps. PM routine must have 6–9 steps.
-   - If sensitiveMode=true, AM may be 4–6 and PM may be 5–8, but still specific.
+   - If sensitiveMode=true or routineIntensity=minimal, AM may be 4–6 and PM may be 4–7, but still specific.
+   - If routineIntensity=more_active, lean toward the higher end of the range when tolerated.
 3) Every routine step MUST include:
    - a CATEGORY (cleanser/toner/serum/moisturizer/sunscreen/etc),
    - a FREQUENCY (daily / 2x-week / etc),
@@ -577,6 +597,7 @@ FINAL CHECK BEFORE YOU ANSWER:
     prefs: {
       age?: number;
       valueFocus: ValueFocus;
+      routineIntensity: RoutineIntensity;
       fragranceFree: boolean;
       pregnancySafe: boolean;
       sensitiveMode: boolean;
@@ -591,6 +612,11 @@ FINAL CHECK BEFORE YOU ANSWER:
 
     if (!VALID_VALUE_FOCUS.has(prefs.valueFocus)) {
       throw new Error(`Invalid valueFocus preference: ${prefs.valueFocus}`);
+    }
+    if (!VALID_ROUTINE_INTENSITY.has(prefs.routineIntensity)) {
+      throw new Error(
+        `Invalid routineIntensity preference: ${prefs.routineIntensity}`
+      );
     }
 
     const analysisText = stringifyForComplianceCheck(json);
@@ -636,8 +662,8 @@ FINAL CHECK BEFORE YOU ANSWER:
     const userPreferences = {
       goals: userPrefs.goals || "",
       age: typeof userPrefs.age === "number" ? userPrefs.age : undefined,
-      valueFocus:
-        userPrefs.valueFocus || "best_value",
+      valueFocus: userPrefs.valueFocus || "best_value",
+      routineIntensity: userPrefs.routineIntensity || "balanced",
       fragranceFree: !!userPrefs.fragranceFree,
       pregnancySafe: !!userPrefs.pregnancySafe,
       sensitiveMode: !!userPrefs.sensitiveMode,
