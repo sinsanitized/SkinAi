@@ -145,30 +145,31 @@ function SkinResult() {
             aria-labelledby="skin-explanation-heading"
           >
             <h2 id="skin-explanation-heading">🧠 Why this recommendation</h2>
+            <div className="explanationGrid">
+              <div className="explanationSection">
+                <h3>What your skin type means</h3>
+                <p className="itemBody">{explanation.skinTypeExplanation}</p>
+              </div>
 
-            <div className="explanationSection">
-              <h3>What your skin type means</h3>
-              <p className="itemBody">{explanation.skinTypeExplanation}</p>
-            </div>
+              <div className="explanationSection">
+                <h3>How the products help</h3>
+                <ul className="list">
+                  {explanation.productBenefits.map((benefit: string, i: number) => (
+                    <li key={i}>
+                      <div className="itemBody">{benefit}</div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
 
-            <div className="explanationSection">
-              <h3>How the products help</h3>
-              <ul className="list">
-                {explanation.productBenefits.map((benefit: string, i: number) => (
-                  <li key={i}>
-                    <div className="itemBody">{benefit}</div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="explanationSection">
-              <h3>How to stack the routine</h3>
-              <ol className="stackingList">
-                {explanation.layeringGuide.map((step: string, i: number) => (
-                  <li key={i}>{step}</li>
-                ))}
-              </ol>
+              <div className="explanationSection">
+                <h3>How to stack the routine</h3>
+                <ol className="stackingList">
+                  {explanation.layeringGuide.map((step: string, i: number) => (
+                    <li key={i}>{step}</li>
+                  ))}
+                </ol>
+              </div>
             </div>
           </section>
         ) : null}
@@ -223,7 +224,7 @@ function SkinResult() {
           </ul>
         </div>
 
-        <div className="card">
+        <div className="card cardWide">
           <h2>🛍️ Product Picks</h2>
           <ul className="list">
             {analysis.products?.slice(0, 10).map((product: ProductRecommendation, i: number) => (

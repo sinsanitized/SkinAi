@@ -1,5 +1,5 @@
 .result-container {
-  width: min(1120px, calc(100% - 2rem));
+  width: min(1040px, calc(100% - 2rem));
   margin: 0 auto;
   padding: 3rem 0 4rem;
 }
@@ -24,8 +24,8 @@
 
 .topRow {
   display: grid;
-  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
-  gap: 1.25rem;
+  grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
+  gap: 1rem;
   align-items: start;
 }
 
@@ -34,15 +34,17 @@
 .card {
   background: var(--surface-card);
   border: 1px solid var(--border-soft);
-  border-radius: 22px;
-  padding: 1.35rem;
+  border-radius: 24px;
+  padding: 1.2rem;
   box-shadow: 0 18px 32px var(--shadow-soft);
 }
 
 .photo {
   width: 100%;
   display: block;
-  border-radius: 16px;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  border-radius: 18px;
 }
 
 .summaryCard {
@@ -51,7 +53,8 @@
 
 .summaryStack {
   display: grid;
-  gap: 0.9rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
   margin-bottom: 1.25rem;
 }
 
@@ -162,17 +165,32 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1.25rem;
   margin-top: 1.25rem;
+  align-items: start;
 }
 
 .cardWide {
   grid-column: 1 / -1;
 }
 
-.explanationSection + .explanationSection {
-  margin-top: 1.15rem;
+.explanationGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.explanationSection {
+  min-width: 0;
+  padding: 1rem;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--surface-input-soft) 86%, transparent);
+  border: 1px solid var(--border-soft);
+}
+
+.explanationSection h3 {
+  margin-bottom: 0.65rem;
 }
 
 .routineBlock + .routineBlock {
@@ -273,11 +291,17 @@
     max-width: 420px;
     margin: 0 auto;
   }
+
+  .summaryStack,
+  .grid,
+  .explanationGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {
   .result-container {
-    width: min(100% - 1rem, 1120px);
+    width: min(100% - 1rem, 1040px);
     padding: 2rem 0 3rem;
   }
 
@@ -289,7 +313,7 @@
   .summaryCard,
   .card {
     padding: 1rem;
-    border-radius: 18px;
+    border-radius: 20px;
   }
 
   .grid {
