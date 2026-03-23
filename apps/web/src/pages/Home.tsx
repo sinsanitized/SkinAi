@@ -10,6 +10,16 @@ import type {
 import "./Home.css";
 
 const RESULT_STORAGE_KEY = "skinai:last-result";
+const ROUTINE_INTENSITY_STEPS: RoutineIntensity[] = [
+  "minimal",
+  "balanced",
+  "more_active",
+];
+const ROUTINE_INTENSITY_LABELS: Record<RoutineIntensity, string> = {
+  minimal: "Minimal",
+  balanced: "Balanced",
+  more_active: "Intense",
+};
 const DEFAULT_ANALYSIS_OPTIONS: SkinAnalysisRequest = {
   goals: "",
   routineIntensity: "balanced",
@@ -31,6 +41,14 @@ function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
+function resolveRoutineIntensity(
+  routineIntensity?: RoutineIntensity,
+): RoutineIntensity {
+  return ROUTINE_INTENSITY_STEPS.includes(routineIntensity as RoutineIntensity)
+    ? (routineIntensity as RoutineIntensity)
+    : "balanced";
+}
+
 function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -40,6 +58,12 @@ function Home() {
   const locationState = location.state as HomeLocationState | null;
   const [analysisOptions, setAnalysisOptions] = useState<SkinAnalysisRequest>(
     locationState?.draftOptions ?? DEFAULT_ANALYSIS_OPTIONS,
+  );
+  const activeRoutineIntensity = resolveRoutineIntensity(
+    analysisOptions.routineIntensity,
+  );
+  const routineIntensityStep = ROUTINE_INTENSITY_STEPS.indexOf(
+    activeRoutineIntensity,
   );
 
   const handleAnalyze = async () => {
@@ -134,56 +158,60 @@ function Home() {
               <h2 className="sectionTitle">Preferences</h2>
               <fieldset className="prefs-grid">
                 <legend className="prefLegend">Preferences</legend>
-                <label className="preferenceChip">
+                <div className="intensitySliderCard">
+                  <div className="intensitySliderHeader">
+                    <span className="preferenceLabel">Routine intensity</span>
+                    <strong className="intensityValue">
+                      {ROUTINE_INTENSITY_LABELS[activeRoutineIntensity]}
+                    </strong>
+                  </div>
                   <input
-                    type="radio"
-                    name="routine-intensity"
-                    value="minimal"
-                    checked={analysisOptions.routineIntensity === "minimal"}
+                    className="intensitySlider"
+                    type="range"
+                    min="0"
+                    max="2"
+                    step="1"
+                    value={routineIntensityStep < 0 ? 1 : routineIntensityStep}
+                    aria-label="Routine intensity"
                     onChange={(e) =>
                       setAnalysisOptions((currentOptions) => ({
                         ...currentOptions,
-                        routineIntensity: e.target.value as RoutineIntensity,
+                        routineIntensity:
+                          ROUTINE_INTENSITY_STEPS[Number(e.target.value)] ||
+                          "balanced",
                       }))
                     }
                   />
-                  <span>Minimal</span>
-                </label>
-
-                <label className="preferenceChip">
-                  <input
-                    type="radio"
-                    name="routine-intensity"
-                    value="balanced"
-                    checked={
-                      (analysisOptions.routineIntensity || "balanced") ===
-                      "balanced"
-                    }
-                    onChange={(e) =>
-                      setAnalysisOptions((currentOptions) => ({
-                        ...currentOptions,
-                        routineIntensity: e.target.value as RoutineIntensity,
-                      }))
-                    }
-                  />
-                  <span>Balanced</span>
-                </label>
-
-                <label className="preferenceChip">
-                  <input
-                    type="radio"
-                    name="routine-intensity"
-                    value="more_active"
-                    checked={analysisOptions.routineIntensity === "more_active"}
-                    onChange={(e) =>
-                      setAnalysisOptions((currentOptions) => ({
-                        ...currentOptions,
-                        routineIntensity: e.target.value as RoutineIntensity,
-                      }))
-                    }
-                  />
-                  <span>Intense</span>
-                </label>
+                  <div className="intensityScale" aria-hidden="true">
+                    <span
+                      className={
+                        activeRoutineIntensity === "minimal" ? "isActive" : ""
+                      }
+                    >
+                      Minimal
+                    </span>
+                    <span
+                      className={
+                        activeRoutineIntensity === "balanced" ? "isActive" : ""
+                      }
+                    >
+                      Balanced
+                    </span>
+                    <span
+                      className={
+                        activeRoutineIntensity === "more_active"
+                          ? "isActive"
+                          : ""
+                      }
+                    >
+                      Intense
+                    </span>
+                  </div>
+                  <p className="helperText intensityHelper">
+                    Slide left for a simpler routine or right for a more active
+                    plan.
+                  </p>
+                </div>
 
                 <label className="preferenceChip">
                   <input

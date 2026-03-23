@@ -114,6 +114,67 @@
   border: 0;
 }
 
+.intensitySliderCard {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 0.7rem;
+  padding: 1rem;
+  border-radius: 18px;
+  border: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--surface-card) 90%, transparent);
+}
+
+.intensitySliderHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.preferenceLabel,
+.intensityValue {
+  font-size: 0.95rem;
+}
+
+.preferenceLabel {
+  font-weight: 700;
+  color: var(--text-tertiary);
+}
+
+.intensityValue {
+  color: var(--text-primary);
+}
+
+.intensitySlider {
+  width: 100%;
+  accent-color: var(--accent-primary);
+}
+
+.intensityScale {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  font-size: 0.84rem;
+  color: var(--text-secondary);
+}
+
+.intensityScale span:nth-child(2) {
+  text-align: center;
+}
+
+.intensityScale span:last-child {
+  text-align: right;
+}
+
+.intensityScale .isActive {
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.intensityHelper {
+  margin: 0;
+}
+
 .prefLegend {
   position: absolute;
   width: 1px;
