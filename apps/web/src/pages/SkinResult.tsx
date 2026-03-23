@@ -6,7 +6,6 @@ import type {
   ProductRecommendation,
   SkinAnalysisRequest,
   SkinAnalysisResponse,
-  SkinConcern,
   SkinEducation,
 } from "@skinai/shared-types";
 import "./SkinResult.css";
@@ -23,11 +22,7 @@ function getConfidenceMeta(confidence: number) {
   const percent = Math.round(confidence * 100);
 
   if (percent >= 80) {
-    return {
-      percent,
-      label: "High confidence",
-      toneClassName: "confidenceHigh",
-    };
+    return { percent, label: "High confidence", toneClassName: "confidenceHigh" };
   }
 
   if (percent >= 50) {
@@ -38,17 +33,35 @@ function getConfidenceMeta(confidence: number) {
     };
   }
 
-  return {
-    percent,
-    label: "Low confidence",
-    toneClassName: "confidenceLow",
-  };
+  return { percent, label: "Low confidence", toneClassName: "confidenceLow" };
 }
 
 function isFallbackAnalysis(analysis: SkinAnalysisResponse) {
   return analysis.disclaimers?.some((disclaimer) =>
     disclaimer.toLowerCase().includes("fallback response")
   );
+}
+
+function buildWhyRecommendation(
+  analysis: SkinAnalysisResponse,
+  explanation?: SkinEducation
+) {
+  if (explanation?.skinTypeExplanation?.trim()) {
+    return explanation.skinTypeExplanation;
+  }
+
+  const concern = analysis.concerns?.[0]?.name?.toLowerCase();
+  const ingredient = analysis.ingredients?.[0]?.ingredient;
+
+  if (concern && ingredient) {
+    return `These recommendations focus on ${concern} while using ${ingredient} to support a simpler, more targeted routine.`;
+  }
+
+  if (concern) {
+    return `These recommendations are designed to support ${concern} with a routine that is easier to follow consistently.`;
+  }
+
+  return "These recommendations are structured to keep the routine simple, readable, and easier to follow.";
 }
 
 function SkinResult() {
@@ -73,33 +86,21 @@ function SkinResult() {
     return null;
   }
 
-  const { analysis, imageDataUrl } = state;
+  const { analysis } = state;
   const explanation: SkinEducation | undefined = analysis.explanation;
   const confidence = getConfidenceMeta(analysis.skinType.confidence);
   const primaryConcern = analysis.concerns?.[0];
   const fallbackAnalysis = isFallbackAnalysis(analysis);
   const shouldReduceMotion = useReducedMotion();
+  const whyRecommendation = buildWhyRecommendation(analysis, explanation);
 
-  const stackVariants = {
-    hidden: {},
-    visible: {
-      transition: {
-        staggerChildren: shouldReduceMotion ? 0 : 0.08,
-        delayChildren: shouldReduceMotion ? 0 : 0.04,
-      },
-    },
-  };
-
-  const cardVariants = {
-    hidden: shouldReduceMotion
-      ? { opacity: 0 }
-      : { opacity: 0, y: 22, scale: 0.985 },
+  const reveal = {
+    hidden: shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 20 },
     visible: {
       opacity: 1,
       y: 0,
-      scale: 1,
       transition: {
-        duration: shouldReduceMotion ? 0.18 : 0.42,
+        duration: shouldReduceMotion ? 0.18 : 0.36,
         ease: [0.22, 1, 0.36, 1] as const,
       },
     },
@@ -107,226 +108,177 @@ function SkinResult() {
 
   return (
     <motion.main
-      className="result-container"
+      className="resultPage"
       initial="hidden"
       animate="visible"
-      variants={stackVariants}
+      variants={reveal}
     >
-      <h1 className="title">SkinAI Results</h1>
+      <motion.section className="resultsCard" variants={reveal}>
+        <header className="resultsHeader">
+          <p className="resultsEyebrow">SkinAI Results</p>
+          <h1 className="resultsTitle">Your skincare plan</h1>
+          <p className="resultsIntro">
+            A structured summary of the visible concerns, routine steps, and
+            ingredients worth focusing on.
+          </p>
+        </header>
 
-      {fallbackAnalysis ? (
-        <motion.div
-          className="warningBanner"
-          role="alert"
-          aria-live="polite"
-          variants={cardVariants}
-        >
-          ⚠️ We couldn&apos;t confidently analyze your input. Try adding more
-          detail.
-        </motion.div>
-      ) : null}
-
-      <motion.div className="topRow" variants={stackVariants}>
-        <motion.div className="photoCard" variants={cardVariants}>
-          {imageDataUrl ? (
-            <img
-              src={imageDataUrl}
-              alt="Uploaded face photo used for skin analysis"
-              className="photo"
-            />
-          ) : (
-            <div className="muted" role="status" aria-live="polite">
-              Original photo preview unavailable.
-            </div>
-          )}
-        </motion.div>
-
-        <motion.div className="summaryCard" variants={cardVariants}>
-          <h2>🧴 Skin Analysis</h2>
-          <div className="summaryStack">
-            <div className="summaryItem">
-              <span className="summaryLabel">Condition</span>
-              <strong>{primaryConcern?.name || analysis.skinType.type}</strong>
-            </div>
-            <div className="summaryItem">
-              <span className="summaryLabel">Severity</span>
-              <strong>{primaryConcern?.severity || "Moderate"}</strong>
-            </div>
-            <div className={`confidencePill ${confidence.toneClassName}`}>
-              📊 {confidence.percent}% - {confidence.label}
-            </div>
-            <div className="pill">Skin type: {analysis.skinType.type}</div>
+        {fallbackAnalysis ? (
+          <div className="resultsWarning" role="alert" aria-live="polite">
+            ⚠️ Unable to analyze input. Try adding more detail.
           </div>
-
-          <h2>Top concerns</h2>
-          <div className="concerns">
-            {analysis.concerns?.slice(0, 6).map((c: SkinConcern, idx: number) => (
-              <div key={idx} className="concern">
-                <div className="concernName">{c.name}</div>
-                <div className="concernMeta">
-                  {c.severity} • {Math.round(c.confidence * 100)}%
-                </div>
-                {c.evidence ? (
-                  <div className="concernEvidence">{c.evidence}</div>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      </motion.div>
-
-      <motion.div className="grid" variants={stackVariants}>
-        {explanation ? (
-          <motion.section
-            className="card cardWide"
-            aria-labelledby="skin-explanation-heading"
-            variants={cardVariants}
-          >
-            <h2 id="skin-explanation-heading">🧠 Why this recommendation</h2>
-            <div className="explanationGrid">
-              <motion.div className="explanationSection" variants={cardVariants}>
-                <h3>What your skin type means</h3>
-                <p className="itemBody">{explanation.skinTypeExplanation}</p>
-              </motion.div>
-
-              <motion.div className="explanationSection" variants={cardVariants}>
-                <h3>How the products help</h3>
-                <ul className="list">
-                  {explanation.productBenefits.map((benefit: string, i: number) => (
-                    <li key={i}>
-                      <div className="itemBody">{benefit}</div>
-                    </li>
-                  ))}
-                </ul>
-              </motion.div>
-
-              <motion.div className="explanationSection" variants={cardVariants}>
-                <h3>How to stack the routine</h3>
-                <ol className="stackingList">
-                  {explanation.layeringGuide.map((step: string, i: number) => (
-                    <li key={i}>{step}</li>
-                  ))}
-                </ol>
-              </motion.div>
-            </div>
-          </motion.section>
         ) : null}
 
-        <motion.div className="card" variants={cardVariants}>
-          <h2>🌞 Morning Routine</h2>
-          <div className="routineBlock">
-            <ol>
-              {analysis.routine?.AM?.map((step: string, i: number) => (
-                <li key={i}>{step}</li>
-              ))}
-            </ol>
+        <section className="resultSection">
+          <h2>Skin Analysis</h2>
+          <div className="detailList">
+            <div className="detailRow">
+              <span className="detailLabel">Condition</span>
+              <span className="detailValue">
+                {primaryConcern?.name || analysis.skinType.type}
+              </span>
+            </div>
+            <div className="detailRow">
+              <span className="detailLabel">Severity</span>
+              <span className="detailValue">
+                {primaryConcern?.severity || "Moderate"}
+              </span>
+            </div>
           </div>
-        </motion.div>
+        </section>
 
-        <motion.div className="card" variants={cardVariants}>
-          <h2>🌙 Night Routine</h2>
-          <div className="routineBlock">
-            <ol>
-              {analysis.routine?.PM?.map((step: string, i: number) => (
-                <li key={i}>{step}</li>
-              ))}
-            </ol>
-          </div>
+        <section className="resultSection">
+          <h2>Morning Routine</h2>
+          <ol className="routineList">
+            {analysis.routine?.AM?.map((step: string, index: number) => (
+              <li key={index}>{step}</li>
+            ))}
+          </ol>
+        </section>
 
+        <section className="resultSection">
+          <h2>Night Routine</h2>
+          <ol className="routineList">
+            {analysis.routine?.PM?.map((step: string, index: number) => (
+              <li key={index}>{step}</li>
+            ))}
+          </ol>
           {analysis.routine?.weekly?.length ? (
-            <div className="routineBlock">
+            <div className="weeklyBlock">
               <h3>Weekly cadence</h3>
-              <ul>
-                {analysis.routine.weekly.map((step: string, i: number) => (
-                  <li key={i}>{step}</li>
+              <ul className="supportList">
+                {analysis.routine.weekly.map((step: string, index: number) => (
+                  <li key={index}>{step}</li>
                 ))}
               </ul>
             </div>
           ) : null}
-        </motion.div>
+        </section>
 
-        <motion.div className="card" variants={cardVariants}>
-          <h2>🧪 Key Ingredients</h2>
-          <ul className="list">
-            {analysis.ingredients?.map((ingredient: IngredientRecommendation, i: number) => (
-              <li key={i}>
-                <div className="itemTitle">{ingredient.ingredient}</div>
-                <div className="itemBody">{ingredient.reason}</div>
-                {ingredient.cautions?.length ? (
-                  <div className="itemCaution">
-                    Caution: {ingredient.cautions.join(" • ")}
-                  </div>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </motion.div>
+        <section className="resultSection">
+          <h2>Key Ingredients</h2>
+          <div className="chipGroup">
+            {analysis.ingredients?.map(
+              (ingredient: IngredientRecommendation, index: number) => (
+                <span key={index} className="ingredientChip">
+                  {ingredient.ingredient}
+                </span>
+              )
+            )}
+          </div>
+        </section>
 
-        <motion.div className="card cardWide" variants={cardVariants}>
-          <h2>🛍️ Product Picks</h2>
-          <ul className="list">
-            {analysis.products?.slice(0, 10).map((product: ProductRecommendation, i: number) => (
-              <li key={i}>
-                <div className="itemTitle">
-                  {product.brand ? `${product.brand} — ` : ""}
-                  {product.name}
-                  <span className="tag">{product.category}</span>
-                </div>
-                <div className="itemBody">{product.why}</div>
-                {product.howToUse ? (
-                  <div className="itemHow">How: {product.howToUse}</div>
-                ) : null}
-                {product.cautions?.length ? (
-                  <div className="itemCaution">
-                    Caution: {product.cautions.join(" • ")}
-                  </div>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </motion.div>
+        <section className="resultSection">
+          <h2>Confidence</h2>
+          <div className={`confidenceCard ${confidence.toneClassName}`}>
+            <div className="confidenceText">
+              {confidence.percent}% - {confidence.label}
+            </div>
+            <div
+              className="confidenceBar"
+              aria-label={`${confidence.percent}% confidence`}
+            >
+              <div
+                className="confidenceBarFill"
+                style={{ width: `${confidence.percent}%` }}
+              />
+            </div>
+          </div>
+        </section>
 
-        <motion.div className="card" variants={cardVariants}>
-          <h2>⚠️ Conflicts & Warnings</h2>
-          {analysis.conflicts?.length ? (
-            <ul className="list">
-              {analysis.conflicts.map((conflict: IngredientConflict, i: number) => (
-                <li key={i}>
-                  <div className="itemTitle">
-                    {conflict.ingredients.join(" + ")}
-                  </div>
-                  <div className="itemBody">{conflict.warning}</div>
-                </li>
+        <section className="resultSection">
+          <h2>Why This Recommendation</h2>
+          <p className="whyCopy">{whyRecommendation}</p>
+          {explanation?.productBenefits?.length ? (
+            <ul className="supportList">
+              {explanation.productBenefits.slice(0, 3).map((benefit, index) => (
+                <li key={index}>{benefit}</li>
               ))}
             </ul>
-          ) : (
-            <p className="muted">None flagged.</p>
-          )}
+          ) : null}
+        </section>
 
-          <h2>Disclaimers</h2>
-          <ul className="list">
-            {analysis.disclaimers?.map((disclaimer: string, i: number) => (
-              <li key={i} className="muted">
-                {disclaimer}
-              </li>
-            ))}
-          </ul>
-        </motion.div>
-      </motion.div>
+        {analysis.products?.length ? (
+          <section className="resultSection">
+            <h2>Product Picks</h2>
+            <ul className="supportList">
+              {analysis.products
+                .slice(0, 4)
+                .map((product: ProductRecommendation, index: number) => (
+                  <li key={index}>
+                    <strong>
+                      {product.brand ? `${product.brand} - ` : ""}
+                      {product.name}
+                    </strong>
+                    {` - ${product.why}`}
+                  </li>
+                ))}
+            </ul>
+          </section>
+        ) : null}
 
-      <motion.div className="resultActions" variants={cardVariants}>
-        <button
-          className="start-over-btn"
-          onClick={() =>
-            navigate("/", { state: { draftOptions: state.analysisOptions } })
-          }
-        >
-          Refine Results
-        </button>
-        <button className="secondary-btn" onClick={() => navigate("/")}>
-          Analyze Another Photo
-        </button>
-      </motion.div>
+        {analysis.conflicts?.length || analysis.disclaimers?.length ? (
+          <section className="resultSection resultSectionMuted">
+            <h2>Notes</h2>
+            {analysis.conflicts?.length ? (
+              <ul className="supportList">
+                {analysis.conflicts.map(
+                  (conflict: IngredientConflict, index: number) => (
+                    <li key={index}>
+                      <strong>{conflict.ingredients.join(" + ")}</strong>
+                      {` - ${conflict.warning}`}
+                    </li>
+                  )
+                )}
+              </ul>
+            ) : null}
+            {analysis.disclaimers?.length ? (
+              <ul className="supportList mutedList">
+                {analysis.disclaimers.map((disclaimer: string, index: number) => (
+                  <li key={index}>{disclaimer}</li>
+                ))}
+              </ul>
+            ) : null}
+          </section>
+        ) : null}
+
+        <footer className="resultsFooter">
+          <p className="refinePrompt">Want to refine your results?</p>
+          <div className="resultActions">
+            <button
+              className="start-over-btn"
+              onClick={() =>
+                navigate("/", { state: { draftOptions: state.analysisOptions } })
+              }
+            >
+              Add more details
+            </button>
+            <button className="secondary-btn" onClick={() => navigate("/")}>
+              Analyze Another Photo
+            </button>
+          </div>
+        </footer>
+      </motion.section>
     </motion.main>
   );
 }
