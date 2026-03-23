@@ -86,7 +86,7 @@ function SkinResult() {
     return null;
   }
 
-  const { analysis } = state;
+  const { analysis, imageDataUrl } = state;
   const explanation: SkinEducation | undefined = analysis.explanation;
   const confidence = getConfidenceMeta(analysis.skinType.confidence);
   const primaryConcern = analysis.concerns?.[0];
@@ -129,6 +129,17 @@ function SkinResult() {
           </div>
         ) : null}
 
+        {imageDataUrl ? (
+          <section className="resultSection resultSectionPhoto">
+            <h2>Uploaded Photo</h2>
+            <img
+              src={imageDataUrl}
+              alt="Uploaded face photo used for skin analysis"
+              className="resultPhoto"
+            />
+          </section>
+        ) : null}
+
         <section className="resultSection">
           <h2>Skin Analysis</h2>
           <div className="detailList">
@@ -149,20 +160,32 @@ function SkinResult() {
 
         <section className="resultSection">
           <h2>Morning Routine</h2>
-          <ol className="routineList">
-            {analysis.routine?.AM?.map((step: string, index: number) => (
-              <li key={index}>{step}</li>
-            ))}
-          </ol>
+          {analysis.routine?.AM?.length ? (
+            <ol className="routineList">
+              {analysis.routine.AM.map((step: string, index: number) => (
+                <li key={index}>{step}</li>
+              ))}
+            </ol>
+          ) : (
+            <p className="emptyCopy">
+              No morning routine steps were returned for this result.
+            </p>
+          )}
         </section>
 
         <section className="resultSection">
           <h2>Night Routine</h2>
-          <ol className="routineList">
-            {analysis.routine?.PM?.map((step: string, index: number) => (
-              <li key={index}>{step}</li>
-            ))}
-          </ol>
+          {analysis.routine?.PM?.length ? (
+            <ol className="routineList">
+              {analysis.routine.PM.map((step: string, index: number) => (
+                <li key={index}>{step}</li>
+              ))}
+            </ol>
+          ) : (
+            <p className="emptyCopy">
+              No night routine steps were returned for this result.
+            </p>
+          )}
           {analysis.routine?.weekly?.length ? (
             <div className="weeklyBlock">
               <h3>Weekly cadence</h3>
@@ -177,15 +200,21 @@ function SkinResult() {
 
         <section className="resultSection">
           <h2>Key Ingredients</h2>
-          <div className="chipGroup">
-            {analysis.ingredients?.map(
-              (ingredient: IngredientRecommendation, index: number) => (
-                <span key={index} className="ingredientChip">
-                  {ingredient.ingredient}
-                </span>
-              )
-            )}
-          </div>
+          {analysis.ingredients?.length ? (
+            <div className="chipGroup">
+              {analysis.ingredients.map(
+                (ingredient: IngredientRecommendation, index: number) => (
+                  <span key={index} className="ingredientChip">
+                    {ingredient.ingredient}
+                  </span>
+                )
+              )}
+            </div>
+          ) : (
+            <p className="emptyCopy">
+              No specific ingredient recommendations were returned.
+            </p>
+          )}
         </section>
 
         <section className="resultSection">
@@ -196,6 +225,10 @@ function SkinResult() {
             </div>
             <div
               className="confidenceBar"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={confidence.percent}
               aria-label={`${confidence.percent}% confidence`}
             >
               <div
