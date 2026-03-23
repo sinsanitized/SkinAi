@@ -1,5 +1,8 @@
 import { getOpenAIClient } from "../config/openai";
 import type {
+  ProductRecommendation,
+  Severity,
+  SkinConcern,
   RoutineIntensity,
   SkinAnalysisResponse,
   SkinAnalysisRequest,
@@ -31,6 +34,30 @@ const VALID_ROUTINE_INTENSITY = new Set<RoutineIntensity>([
   "balanced",
   "more_active",
 ]);
+const VALID_CONCERN_NAMES = new Set<SkinConcern["name"]>([
+  "Inflammatory acne",
+  "Comedonal acne",
+  "Post-inflammatory hyperpigmentation (PIH)",
+  "Post-inflammatory erythema (PIE)",
+  "Redness / irritation",
+  "Dehydration",
+  "Excess oil / sebum",
+  "Texture / clogged pores",
+  "Barrier impairment",
+  "Dark circles",
+  "Fine lines",
+]);
+const VALID_PRODUCT_CATEGORIES = new Set<ProductRecommendation["category"]>([
+  "Cleanser",
+  "Toner",
+  "Essence",
+  "Serum",
+  "Moisturizer",
+  "Sunscreen",
+  "Spot treatment",
+  "Mask",
+]);
+const VALID_SEVERITIES = new Set<Severity>(["Mild", "Moderate", "Severe"]);
 
 function getRoutineLengthTargets(prefs: {
   routineIntensity: RoutineIntensity;
@@ -77,6 +104,67 @@ function sanitizeText(
 
 function serializePromptData(value: unknown): string {
   return JSON.stringify(value, null, 2);
+}
+
+function asNonEmptyString(value: unknown, fallback = ""): string {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed || fallback;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  return fallback;
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => asNonEmptyString(item))
+      .filter((item) => item.length > 0);
+  }
+  const single = asNonEmptyString(value);
+  return single ? [single] : [];
+}
+
+function normalizeConcernName(value: unknown): SkinConcern["name"] {
+  const normalized = asNonEmptyString(value);
+  return VALID_CONCERN_NAMES.has(normalized as SkinConcern["name"])
+    ? (normalized as SkinConcern["name"])
+    : "Barrier impairment";
+}
+
+function normalizeProductCategory(
+  value: unknown
+): ProductRecommendation["category"] {
+  const normalized = asNonEmptyString(value);
+  return VALID_PRODUCT_CATEGORIES.has(
+    normalized as ProductRecommendation["category"]
+  )
+    ? (normalized as ProductRecommendation["category"])
+    : "Serum";
+}
+
+function normalizeSeverity(value: unknown): Severity {
+  const normalized = asNonEmptyString(value);
+  return VALID_SEVERITIES.has(normalized as Severity)
+    ? (normalized as Severity)
+    : "Moderate";
+}
+
+function normalizeConfidenceValue(value: unknown, fallback = 0.5): number {
+  const numeric =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number.parseFloat(value)
+        : Number.NaN;
+
+  if (!Number.isFinite(numeric)) return fallback;
+  if (numeric < 0) return 0;
+  if (numeric <= 1) return numeric;
+  if (numeric <= 100) return numeric / 100;
+  return 1;
 }
 
 /**
@@ -178,39 +266,81 @@ export class OpenAIService {
   private normalizeAnalysisResponse(
     json: SkinAnalysisResponse
   ): SkinAnalysisResponse {
+    const normalizedSkinType = json.skinType?.type || "Sensitive-leaning";
+    const normalizedExplanation = json.explanation ?? ({} as SkinAnalysisResponse["explanation"]);
+
     return {
       ...json,
+      skinType: {
+        type: normalizedSkinType,
+        confidence: normalizeConfidenceValue(json.skinType?.confidence, 0.35),
+      },
       explanation: {
-        skinTypeExplanation:
-          json.explanation?.skinTypeExplanation?.trim() ||
-          `Your skin appears ${json.skinType.type.toLowerCase()}, which helps explain the balance of oil, hydration, and sensitivity cues seen in the photo.`,
-        productBenefits:
-          json.explanation?.productBenefits?.filter(Boolean)?.length
-            ? json.explanation.productBenefits
-            : [
-                "The recommended routine focuses on supporting the skin barrier while targeting the most visible concerns from the photo.",
-                "Consistent use of the selected treatments should improve texture, tone, and overall skin stability over time.",
-              ],
-        layeringGuide:
-          json.explanation?.layeringGuide?.filter(Boolean)?.length
-            ? json.explanation.layeringGuide
-            : [
-                "Start with the thinnest product textures first and move toward thicker creams last.",
-                "Apply treatment steps before moisturizer unless a product specifically says to use it as the last treatment step.",
-                "Finish every morning routine with sunscreen as the final layer.",
-              ],
+        skinTypeExplanation: asNonEmptyString(
+          normalizedExplanation.skinTypeExplanation,
+          `Your skin appears ${normalizedSkinType.toLowerCase()}, which helps explain the balance of oil, hydration, and sensitivity cues seen in the photo.`,
+        ),
+        productBenefits: normalizeStringArray(normalizedExplanation.productBenefits)
+          .length
+          ? normalizeStringArray(normalizedExplanation.productBenefits)
+          : [
+              "The recommended routine focuses on supporting the skin barrier while targeting the most visible concerns from the photo.",
+              "Consistent use of the selected treatments should improve texture, tone, and overall skin stability over time.",
+            ],
+        layeringGuide: normalizeStringArray(normalizedExplanation.layeringGuide)
+          .length
+          ? normalizeStringArray(normalizedExplanation.layeringGuide)
+          : [
+              "Start with the thinnest product textures first and move toward thicker creams last.",
+              "Apply treatment steps before moisturizer unless a product specifically says to use it as the last treatment step.",
+              "Finish every morning routine with sunscreen as the final layer.",
+            ],
       },
       routine: {
-        AM: json.routine?.AM ?? [],
-        PM: json.routine?.PM ?? [],
-        weekly: json.routine?.weekly ?? [],
+        AM: normalizeStringArray(json.routine?.AM),
+        PM: normalizeStringArray(json.routine?.PM),
+        weekly: normalizeStringArray(json.routine?.weekly),
       },
-      concerns: json.concerns ?? [],
-      ingredients: json.ingredients ?? [],
-      products: json.products ?? [],
-      conflicts: json.conflicts ?? [],
-      disclaimers: json.disclaimers ?? [],
-      timestamp: json.timestamp || new Date().toISOString(),
+      concerns: (Array.isArray(json.concerns) ? json.concerns : []).map((concern) => ({
+        name: normalizeConcernName(concern?.name),
+        severity: normalizeSeverity(concern?.severity),
+        confidence: normalizeConfidenceValue(concern?.confidence, 0.5),
+        evidence: asNonEmptyString(concern?.evidence) || undefined,
+      })),
+      ingredients: (Array.isArray(json.ingredients) ? json.ingredients : []).map(
+        (ingredient) => ({
+          ingredient: asNonEmptyString(
+            ingredient?.ingredient,
+            "Supportive ingredient"
+          ),
+          reason: asNonEmptyString(
+            ingredient?.reason,
+            "Included as a conservative default recommendation."
+          ),
+          cautions: normalizeStringArray(ingredient?.cautions),
+        })
+      ),
+      products: (Array.isArray(json.products) ? json.products : []).map((product) => ({
+        name: asNonEmptyString(product?.name, "Unspecified product"),
+        brand: asNonEmptyString(product?.brand) || undefined,
+        category: normalizeProductCategory(product?.category),
+        why: asNonEmptyString(
+          product?.why,
+          "Selected to support the most visible skin concerns."
+        ),
+        howToUse: asNonEmptyString(product?.howToUse) || undefined,
+        cautions: normalizeStringArray(product?.cautions),
+        tags: normalizeStringArray(product?.tags),
+      })),
+      conflicts: (Array.isArray(json.conflicts) ? json.conflicts : []).map((conflict) => ({
+        ingredients: normalizeStringArray(conflict?.ingredients),
+        warning: asNonEmptyString(
+          conflict?.warning,
+          "Avoid combining strong actives on the same night unless well tolerated."
+        ),
+      })),
+      disclaimers: normalizeStringArray(json.disclaimers),
+      timestamp: asNonEmptyString(json.timestamp) || new Date().toISOString(),
     };
   }
 
