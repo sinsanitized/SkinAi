@@ -132,26 +132,60 @@ function Home() {
 
             <section className="intakeSection">
               <h2 className="sectionTitle">Preferences</h2>
-              <div className="prefs-grid">
-                <div className="pref">
-                  <label htmlFor="routine-intensity">Routine intensity</label>
-                  <select
-                    id="routine-intensity"
-                    value={analysisOptions.routineIntensity || "balanced"}
+              <fieldset className="prefs-grid">
+                <legend className="prefLegend">Preferences</legend>
+                <label className="preferenceChip">
+                  <input
+                    type="radio"
+                    name="routine-intensity"
+                    value="minimal"
+                    checked={analysisOptions.routineIntensity === "minimal"}
                     onChange={(e) =>
                       setAnalysisOptions((currentOptions) => ({
                         ...currentOptions,
                         routineIntensity: e.target.value as RoutineIntensity,
                       }))
                     }
-                  >
-                    <option value="minimal">Minimal</option>
-                    <option value="balanced">Balanced</option>
-                    <option value="more_active">More active</option>
-                  </select>
-                </div>
+                  />
+                  <span>Minimal</span>
+                </label>
 
-                <label className="checkbox">
+                <label className="preferenceChip">
+                  <input
+                    type="radio"
+                    name="routine-intensity"
+                    value="balanced"
+                    checked={
+                      (analysisOptions.routineIntensity || "balanced") ===
+                      "balanced"
+                    }
+                    onChange={(e) =>
+                      setAnalysisOptions((currentOptions) => ({
+                        ...currentOptions,
+                        routineIntensity: e.target.value as RoutineIntensity,
+                      }))
+                    }
+                  />
+                  <span>Balanced</span>
+                </label>
+
+                <label className="preferenceChip">
+                  <input
+                    type="radio"
+                    name="routine-intensity"
+                    value="more_active"
+                    checked={analysisOptions.routineIntensity === "more_active"}
+                    onChange={(e) =>
+                      setAnalysisOptions((currentOptions) => ({
+                        ...currentOptions,
+                        routineIntensity: e.target.value as RoutineIntensity,
+                      }))
+                    }
+                  />
+                  <span>Intense</span>
+                </label>
+
+                <label className="preferenceChip">
                   <input
                     type="checkbox"
                     checked={!!analysisOptions.fragranceFree}
@@ -162,10 +196,10 @@ function Home() {
                       }))
                     }
                   />
-                  Fragrance-free
+                  <span>Fragrance-free</span>
                 </label>
 
-                <label className="checkbox">
+                <label className="preferenceChip">
                   <input
                     type="checkbox"
                     checked={!!analysisOptions.pregnancySafe}
@@ -176,10 +210,10 @@ function Home() {
                       }))
                     }
                   />
-                  Pregnancy-safe
+                  <span>Pregnancy-safe</span>
                 </label>
 
-                <label className="checkbox">
+                <label className="preferenceChip">
                   <input
                     type="checkbox"
                     checked={!!analysisOptions.sensitiveMode}
@@ -190,9 +224,9 @@ function Home() {
                       }))
                     }
                   />
-                  Sensitive mode (extra gentle)
+                  <span>Sensitive mode</span>
                 </label>
-              </div>
+              </fieldset>
             </section>
 
             <div className="intakeFooter">
