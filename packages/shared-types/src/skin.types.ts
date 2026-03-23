@@ -78,28 +78,11 @@ export interface SkinEducation {
   layeringGuide: string[];
 }
 
-/**
- * Controls how the recommender should think about price/value.
- * - best_value: default bang-for-buck; proven actives, reliable basics
- * - midrange_worth_it: allows a bit more spend for better textures/filters
- * - splurge_if_unique: only spend more when there’s a clear unique advantage
- */
-export type ValueFocus =
-  | "best_value"
-  | "midrange_worth_it"
-  | "splurge_if_unique";
-
 export type RoutineIntensity = "minimal" | "balanced" | "more_active";
 
 export interface SkinAnalysisRequest {
   // image is sent as multipart/form-data; these are optional form fields
   goals?: string; // e.g. "acne + dark spots"
-
-  // NEW: provide age context to tailor intensity + product type
-  age?: number; // e.g. 38
-
-  // NEW: replaces budget
-  valueFocus?: ValueFocus;
 
   // Controls how lean or active the generated routine should be.
   routineIntensity?: RoutineIntensity;

@@ -5,18 +5,11 @@ import type {
   SkinAnalysisResponse,
   SkinAnalysisRequest,
   SkinConcern,
-  ValueFocus,
 } from "@skinai/shared-types";
 import { openAIService } from "../services/openai.service";
 import { pineconeService } from "../services/pinecone.service";
 import { imageProcessingService } from "../services/imageProcessing.service";
 import { SkinAnalysisLogModel } from "../models/SkinAnalysisLog.model";
-
-const VALID_VALUE_FOCUS = new Set<ValueFocus>([
-  "best_value",
-  "midrange_worth_it",
-  "splurge_if_unique",
-]);
 
 const VALID_ROUTINE_INTENSITY = new Set<RoutineIntensity>([
   "minimal",
@@ -43,34 +36,6 @@ export class SkinController {
 
       // Optional preferences (sent as multipart fields)
       const goals = String(req.body.goals ?? "").trim();
-
-      const ageRaw = req.body.age;
-      const age =
-        typeof ageRaw === "string" && ageRaw.trim() !== ""
-          ? Number(ageRaw)
-          : undefined;
-
-      if (
-        typeof age === "number" &&
-        (!Number.isInteger(age) || age < 10 || age > 90)
-      ) {
-        res.status(400).json({
-          success: false,
-          error: "Age must be an integer between 10 and 90",
-        } as ApiResponse<never>);
-        return;
-      }
-
-      const valueFocusRaw = String(req.body.valueFocus ?? "best_value");
-      if (!VALID_VALUE_FOCUS.has(valueFocusRaw as ValueFocus)) {
-        res.status(400).json({
-          success: false,
-          error:
-            "Invalid value focus. Use best_value, midrange_worth_it, or splurge_if_unique",
-        } as ApiResponse<never>);
-        return;
-      }
-      const valueFocus = valueFocusRaw as ValueFocus;
 
       const routineIntensityRaw = String(
         req.body.routineIntensity ?? "balanced"
@@ -127,8 +92,6 @@ export class SkinController {
       // 4) AI skin analysis (structured JSON)
       const userPrefs: SkinAnalysisRequest = {
         goals,
-        age,
-        valueFocus,
         routineIntensity,
         fragranceFree,
         pregnancySafe,
@@ -155,8 +118,6 @@ export class SkinController {
               model: "gpt-4o-mini",
               processingTimeMs: Date.now() - startTime,
               goals,
-              age,
-              valueFocus,
               routineIntensity,
               fragranceFree,
               pregnancySafe,

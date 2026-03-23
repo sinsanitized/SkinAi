@@ -3,7 +3,6 @@ import type {
   RoutineIntensity,
   SkinAnalysisRequest,
   SkinAnalysisResponse,
-  ValueFocus,
 } from "@skinai/shared-types";
 
 // In dev, use Vite proxy by default (same-origin).
@@ -20,17 +19,6 @@ export class SkinAnalysisApi {
 
     if (analysisOptions.goals) {
       formData.append("goals", analysisOptions.goals);
-    }
-
-    if (typeof analysisOptions.age === "number") {
-      formData.append("age", String(analysisOptions.age));
-    }
-
-    if (analysisOptions.valueFocus) {
-      formData.append(
-        "valueFocus",
-        analysisOptions.valueFocus satisfies ValueFocus
-      );
     }
 
     if (analysisOptions.routineIntensity) {

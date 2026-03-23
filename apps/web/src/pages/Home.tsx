@@ -6,15 +6,12 @@ import { skinAnalysisApi } from "../services/skinAnalysisApi";
 import type {
   RoutineIntensity,
   SkinAnalysisRequest,
-  ValueFocus,
 } from "@skinai/shared-types";
 import "./Home.css";
 
 const RESULT_STORAGE_KEY = "skinai:last-result";
 const DEFAULT_ANALYSIS_OPTIONS: SkinAnalysisRequest = {
   goals: "",
-  age: 38,
-  valueFocus: "best_value",
   routineIntensity: "balanced",
   fragranceFree: false,
   pregnancySafe: false,
@@ -136,48 +133,6 @@ function Home() {
             <section className="intakeSection">
               <h2 className="sectionTitle">Preferences</h2>
               <div className="prefs-grid">
-                <div className="pref">
-                  <label htmlFor="skin-age">Age</label>
-                  <input
-                    id="skin-age"
-                    type="number"
-                    min={10}
-                    max={90}
-                    value={
-                      typeof analysisOptions.age === "number"
-                        ? analysisOptions.age
-                        : ""
-                    }
-                    onChange={(e) => {
-                      const n = Number(e.target.value);
-                      setAnalysisOptions((currentOptions) => ({
-                        ...currentOptions,
-                        age: Number.isFinite(n) ? n : undefined,
-                      }));
-                    }}
-                  />
-                </div>
-
-                <div className="pref">
-                  <label htmlFor="value-focus">Value focus</label>
-                  <select
-                    id="value-focus"
-                    value={analysisOptions.valueFocus || "best_value"}
-                    onChange={(e) =>
-                      setAnalysisOptions((currentOptions) => ({
-                        ...currentOptions,
-                        valueFocus: e.target.value as ValueFocus,
-                      }))
-                    }
-                  >
-                    <option value="best_value">Best value (worth it)</option>
-                    <option value="midrange_worth_it">Midrange worth it</option>
-                    <option value="splurge_if_unique">
-                      Splurge only if unique
-                    </option>
-                  </select>
-                </div>
-
                 <div className="pref">
                   <label htmlFor="routine-intensity">Routine intensity</label>
                   <select

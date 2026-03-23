@@ -3,7 +3,6 @@ import type {
   RoutineIntensity,
   SkinAnalysisResponse,
   SkinAnalysisRequest,
-  ValueFocus,
 } from "@skinai/shared-types";
 import { logger } from "../utils/logger";
 import { skinAnalysisResponseSchema } from "../validation/skinAnalysis.schema";
@@ -26,12 +25,6 @@ const FRAGRANCE_TERMS = [
   "essential oil",
   "fragrant oil",
 ] as const;
-
-const VALID_VALUE_FOCUS = new Set<ValueFocus>([
-  "best_value",
-  "midrange_worth_it",
-  "splurge_if_unique",
-]);
 
 const VALID_ROUTINE_INTENSITY = new Set<RoutineIntensity>([
   "minimal",
@@ -94,8 +87,6 @@ export class OpenAIService {
   private buildSafeFallbackAnalysis(args: {
     prefs: {
       goals: string;
-      age?: number;
-      valueFocus: ValueFocus;
       routineIntensity: RoutineIntensity;
       fragranceFree: boolean;
       pregnancySafe: boolean;
@@ -209,8 +200,6 @@ export class OpenAIService {
   private sanitizeForPreferences(
     json: SkinAnalysisResponse,
     prefs: {
-      age?: number;
-      valueFocus: ValueFocus;
       routineIntensity: RoutineIntensity;
       fragranceFree: boolean;
       pregnancySafe: boolean;
@@ -402,8 +391,6 @@ If something is not clearly visible, explicitly say that.
   private buildSkinPrompt(args: {
     userPreferences: {
       goals: string;
-      age?: number;
-      valueFocus: "best_value" | "midrange_worth_it" | "splurge_if_unique";
       routineIntensity: "minimal" | "balanced" | "more_active";
       fragranceFree: boolean;
       pregnancySafe: boolean;
@@ -427,14 +414,6 @@ ROLE + STYLE:
 
 USER CONTEXT (must be respected):
 - goals: "${userPreferences.goals}"
-- age: ${
-      typeof userPreferences.age === "number"
-        ? userPreferences.age
-        : "unknown"
-    } (use age to adjust routine intensity + product selection)
-- valueFocus: "${
-      userPreferences.valueFocus
-    }" (optimize for *worth it* / best value — NOT just cheapest)
 - routineIntensity: "${
       userPreferences.routineIntensity
     }" (minimal = fewer steps and slower ramp; balanced = default; more_active = fuller routine and more treatment detail if tolerated)
@@ -453,19 +432,6 @@ ${retrievalContextSummary}
 TASK:
 Analyze ONLY visible facial skin characteristics and produce a structured JSON report matching the exact schema below.
 Output MUST be VALID JSON ONLY. No markdown. No commentary.
-
-VALUE RULE (CRITICAL):
-Recommend “worth it” products: prioritize proven formulas, high-evidence actives, appropriate concentrations, good tolerability, and reliable brands.
-- Do NOT blindly pick the cheapest products.
-- Prefer the best bang-for-buck items that perform like pricier options.
-- Only recommend higher-priced (“splurge”) items when there is a clear unique benefit vs cheaper alternatives (better filters, delivery system, exceptional tolerability, unique ingredient tech).
-- When multiple options work similarly, choose the best-value option.
-
-AGE GUIDANCE (CRITICAL):
-Use age to tailor intensity + focus:
-- If age is unknown, be conservative and avoid overly aggressive routines.
-- Generally: younger skin often needs simpler acne/oil control + barrier support; older skin may benefit more from pigmentation support, barrier support, and consistent retinoid use (unless pregnancySafe).
-- Always prioritize tolerance and safe ramp-up.
 
 ROUTINE INTENSITY GUIDANCE (CRITICAL):
 - If routineIntensity=minimal, keep the routine lean, reduce optional steps, use fewer treatment nights, and prefer easier-to-follow structure.
@@ -595,24 +561,12 @@ FINAL CHECK BEFORE YOU ANSWER:
   private assertPreferenceCompliance(
     json: SkinAnalysisResponse,
     prefs: {
-      age?: number;
-      valueFocus: ValueFocus;
       routineIntensity: RoutineIntensity;
       fragranceFree: boolean;
       pregnancySafe: boolean;
       sensitiveMode: boolean;
     }
   ): void {
-    if (
-      typeof prefs.age === "number" &&
-      (!Number.isInteger(prefs.age) || prefs.age < 10 || prefs.age > 90)
-    ) {
-      throw new Error(`Invalid age preference: ${prefs.age}`);
-    }
-
-    if (!VALID_VALUE_FOCUS.has(prefs.valueFocus)) {
-      throw new Error(`Invalid valueFocus preference: ${prefs.valueFocus}`);
-    }
     if (!VALID_ROUTINE_INTENSITY.has(prefs.routineIntensity)) {
       throw new Error(
         `Invalid routineIntensity preference: ${prefs.routineIntensity}`
@@ -661,8 +615,6 @@ FINAL CHECK BEFORE YOU ANSWER:
 
     const userPreferences = {
       goals: userPrefs.goals || "",
-      age: typeof userPrefs.age === "number" ? userPrefs.age : undefined,
-      valueFocus: userPrefs.valueFocus || "best_value",
       routineIntensity: userPrefs.routineIntensity || "balanced",
       fragranceFree: !!userPrefs.fragranceFree,
       pregnancySafe: !!userPrefs.pregnancySafe,

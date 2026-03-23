@@ -9,9 +9,7 @@ export interface SkinAnalysisLogDocument extends Document {
     model?: string;
     processingTime?: number;
     goals?: string;
-
-    age?: number;
-    valueFocus?: string;
+    routineIntensity?: string;
 
     fragranceFree?: boolean;
     pregnancySafe?: boolean;
@@ -49,10 +47,7 @@ const SkinAnalysisLogSchema = new Schema<SkinAnalysisLogDocument>(
       processingTimeMs: Number,
 
       goals: String,
-
-      // NEW
-      age: Number,
-      valueFocus: String,
+      routineIntensity: String,
 
       fragranceFree: Boolean,
       pregnancySafe: Boolean,
