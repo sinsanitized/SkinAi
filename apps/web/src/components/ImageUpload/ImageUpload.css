@@ -54,6 +54,7 @@
   width: 100%;
   max-width: 560px;
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.8rem;
 }
 
@@ -62,10 +63,11 @@
 }
 
 .image-upload-secondary-actions {
-  display: flex;
-  gap: 0.75rem;
-  justify-content: center;
-  flex-wrap: wrap;
+  display: contents;
+}
+
+.image-upload-secondary-actions > button {
+  width: 100%;
 }
 
 .image-upload-error {
@@ -130,9 +132,10 @@
 }
 
 @media (max-width: 640px) {
+  .image-upload-actions,
   .image-upload-secondary-actions,
   .image-upload-webcam-actions {
-    flex-direction: column;
+    grid-template-columns: 1fr;
     width: 100%;
   }
 }

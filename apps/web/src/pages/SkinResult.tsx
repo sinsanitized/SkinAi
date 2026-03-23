@@ -296,17 +296,8 @@ function SkinResult() {
         ) : null}
 
         <footer className="resultsFooter">
-          <p className="refinePrompt">Want to refine your results?</p>
           <div className="resultActions">
-            <button
-              className="start-over-btn"
-              onClick={() =>
-                navigate("/", { state: { draftOptions: state.analysisOptions } })
-              }
-            >
-              Add more details
-            </button>
-            <button className="secondary-btn" onClick={() => navigate("/")}>
+            <button className="start-over-btn" onClick={() => navigate("/")}>
               Analyze Another Photo
             </button>
           </div>
