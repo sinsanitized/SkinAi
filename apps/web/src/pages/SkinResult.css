@@ -73,7 +73,7 @@
 
 .resultSection h2 {
   margin-bottom: 0.8rem;
-  font-size: 1.05rem;
+  font-size: clamp(1rem, 2vw, 1.05rem);
 }
 
 .resultSection h3 {
@@ -214,8 +214,8 @@
 }
 
 .resultsFooter {
-  margin-top: 1.6rem;
-  padding-top: 1.2rem;
+  margin-top: clamp(1.2rem, 2.2vw, 1.6rem);
+  padding-top: clamp(1rem, 2vw, 1.2rem);
   border-top: 1px solid var(--border-soft);
 }
 
@@ -255,9 +255,13 @@
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 720px) {
   .resultPage {
     width: min(100% - 0.75rem, 760px);
+  }
+
+  .resultPhoto {
+    width: min(100%, 280px);
   }
 
   .detailRow,

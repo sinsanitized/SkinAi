@@ -5,8 +5,8 @@
   align-items: center;
   width: 100%;
   border: 1px solid var(--border-soft);
-  padding: 1.4rem;
-  border-radius: 24px;
+  padding: clamp(1rem, 2.4vw, 1.4rem);
+  border-radius: clamp(18px, 2vw, 24px);
   background: var(--surface-elevated);
   transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
 }
@@ -30,9 +30,9 @@
   width: 100%;
   max-width: 560px;
   cursor: pointer;
-  padding: 1.5rem;
+  padding: clamp(1rem, 2.6vw, 1.5rem);
   border: 2px dashed var(--border-strong);
-  border-radius: 22px;
+  border-radius: clamp(16px, 2vw, 22px);
   text-align: center;
   background: var(--surface-input-soft);
   transition: border-color 0.18s ease, background-color 0.18s ease,
@@ -113,7 +113,7 @@
 .image-upload-preview {
   width: min(100%, 320px);
   aspect-ratio: 1 / 1;
-  border-radius: 20px;
+  border-radius: clamp(16px, 2vw, 20px);
   object-fit: cover;
   border: 1px solid var(--border-strong);
   box-shadow: 0 20px 28px var(--shadow-strong);
@@ -123,17 +123,13 @@
   min-width: 140px;
 }
 
+@media (max-width: 860px) {
+  .image-upload-preview {
+    width: min(100%, 280px);
+  }
+}
+
 @media (max-width: 640px) {
-  .image-upload-container {
-    padding: 1rem;
-    border-radius: 20px;
-  }
-
-  .image-upload-dropzone {
-    padding: 1.2rem;
-    border-radius: 18px;
-  }
-
   .image-upload-secondary-actions,
   .image-upload-webcam-actions {
     flex-direction: column;
