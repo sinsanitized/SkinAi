@@ -82,6 +82,31 @@
   color: var(--text-tertiary);
 }
 
+.escalationCard {
+  margin-bottom: 1.2rem;
+  padding: 1rem 1.05rem;
+  border-radius: 18px;
+}
+
+.escalationCard p {
+  margin: 0;
+}
+
+.escalationSubcopy {
+  margin-top: 0.7rem !important;
+  color: var(--text-secondary);
+}
+
+.escalationMedical {
+  border: 1px solid rgba(185, 28, 28, 0.2);
+  background: color-mix(in srgb, #fee2e2 76%, var(--surface-card));
+}
+
+.escalationMonitor {
+  border: 1px solid rgba(217, 119, 6, 0.2);
+  background: color-mix(in srgb, #fef3c7 72%, var(--surface-card));
+}
+
 .detailList {
   display: grid;
   gap: 0.75rem;

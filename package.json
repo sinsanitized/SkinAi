@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace=apps/web & npm run dev --workspace=apps/api",
+    "dev": "node scripts/dev.mjs",
     "dev:web": "npm run dev --workspace=apps/web",
     "dev:api": "npm run dev --workspace=apps/api",
     "build": "npm run build --workspace=@skinai/shared-types && npm run build --workspace=@skinai/utils && npm run build --workspace=@skinai/api && npm run build --workspace=@skinai/web",

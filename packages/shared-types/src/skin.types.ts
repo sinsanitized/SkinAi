@@ -68,6 +68,13 @@ export interface IngredientConflict {
   warning: string;
 }
 
+export type EscalationLevel = "none" | "monitor" | "medical_review";
+
+export interface EscalationAssessment {
+  level: EscalationLevel;
+  reason: string;
+}
+
 export interface SkinEducation {
   // Plain-language summary for the user-facing explanation panel.
   skinTypeExplanation: string;
@@ -101,6 +108,7 @@ export interface SkinAnalysisResponse {
   products: ProductRecommendation[];
   routine: RoutinePlan;
   conflicts: IngredientConflict[];
+  escalation: EscalationAssessment;
   disclaimers: string[];
   timestamp: string;
 }

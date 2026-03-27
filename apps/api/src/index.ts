@@ -59,7 +59,7 @@ async function startServer() {
     }
 
     // Start listening
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       const startupSummary = [
         "SkinAI API startup",
         `- Environment: ${environment}`,
@@ -75,6 +75,18 @@ async function startServer() {
       ].join("\n");
 
       logger.info(startupSummary);
+    });
+
+    server.on("error", (error: NodeJS.ErrnoException) => {
+      if (error.code === "EADDRINUSE") {
+        logger.error(
+          `Port ${PORT} is already in use. Stop the existing process or restart with PORT=<open-port>.`
+        );
+        process.exit(1);
+      }
+
+      logger.error("Failed to start server:", error.message || error);
+      process.exit(1);
     });
   } catch (error: any) {
     logger.error("Failed to start server:", error.message || error);

@@ -1,5 +1,7 @@
 import { getOpenAIClient } from "../config/openai";
 import type {
+  EscalationAssessment,
+  EscalationLevel,
   ProductRecommendation,
   Severity,
   SkinConcern,
@@ -58,6 +60,46 @@ const VALID_PRODUCT_CATEGORIES = new Set<ProductRecommendation["category"]>([
   "Mask",
 ]);
 const VALID_SEVERITIES = new Set<Severity>(["Mild", "Moderate", "Severe"]);
+const VALID_ESCALATION_LEVELS = new Set<EscalationLevel>([
+  "none",
+  "monitor",
+  "medical_review",
+]);
+const MEDICAL_REVIEW_TERMS = [
+  "severe",
+  "widespread",
+  "extensive",
+  "nodul",
+  "cyst",
+  "raw",
+  "crust",
+  "ooz",
+  "bleed",
+  "infect",
+  "ulcer",
+  "open lesion",
+  "scarr",
+] as const;
+const AGGRESSIVE_ACTIVE_TERMS = [
+  "retinoid",
+  "retinol",
+  "retinal",
+  "retinaldehyde",
+  "tretinoin",
+  "adapalene",
+  "tazarotene",
+  "trifarotene",
+  "benzoyl peroxide",
+  "salicylic",
+  "glycolic",
+  "lactic acid",
+  "mandelic",
+  "aha",
+  "bha",
+  "pha",
+  "peel",
+  "exfoliat",
+] as const;
 
 function getRoutineLengthTargets(prefs: {
   routineIntensity: RoutineIntensity;
@@ -167,6 +209,13 @@ function normalizeConfidenceValue(value: unknown, fallback = 0.5): number {
   return 1;
 }
 
+function normalizeEscalationLevel(value: unknown): EscalationLevel {
+  const normalized = asNonEmptyString(value);
+  return VALID_ESCALATION_LEVELS.has(normalized as EscalationLevel)
+    ? (normalized as EscalationLevel)
+    : "none";
+}
+
 /**
  * Helper function to safely extract JSON from LLM responses.
  * More reliable than a greedy regex: takes the first "{" and last "}".
@@ -189,6 +238,148 @@ const EMBEDDING_CONFIG = {
 } as const;
 
 export class OpenAIService {
+  private deriveEscalationFromAnalysis(
+    json: Partial<SkinAnalysisResponse>
+  ): EscalationAssessment {
+    const explicit = json.escalation;
+    if (explicit?.reason?.trim()) {
+      return {
+        level: normalizeEscalationLevel(explicit.level),
+        reason: asNonEmptyString(
+          explicit.reason,
+          "No escalation reason was provided."
+        ),
+      };
+    }
+
+    const evidenceText = stringifyForComplianceCheck([
+      json.explanation,
+      json.concerns,
+      json.disclaimers,
+    ]).toLowerCase();
+    const severeConcernCount =
+      json.concerns?.filter((concern) => concern?.severity === "Severe").length ??
+      0;
+
+    if (
+      severeConcernCount > 0 ||
+      containsAnyTerm(evidenceText, MEDICAL_REVIEW_TERMS)
+    ) {
+      return {
+        level: "medical_review",
+        reason:
+          "Visible severity may be beyond what an over-the-counter skincare routine can reliably address.",
+      };
+    }
+
+    if (
+      (json.concerns?.length ?? 0) >= 3 ||
+      (json.skinType?.confidence ?? 1) < 0.45
+    ) {
+      return {
+        level: "monitor",
+        reason:
+          "The visible findings warrant a cautious, lower-risk plan and closer follow-up if they do not improve.",
+      };
+    }
+
+    return {
+      level: "none",
+      reason: "No escalation signal was identified from the visible findings.",
+    };
+  }
+
+  private applyEscalationGuardrails(
+    json: SkinAnalysisResponse
+  ): SkinAnalysisResponse {
+    if (json.escalation.level !== "medical_review") {
+      return json;
+    }
+
+    const filteredIngredients = json.ingredients.filter((ingredient) => {
+      const ingredientText = stringifyForComplianceCheck(ingredient);
+      return !containsAnyTerm(ingredientText, AGGRESSIVE_ACTIVE_TERMS);
+    });
+    const filteredProducts = json.products.filter((product) => {
+      const productText = stringifyForComplianceCheck(product);
+      const isSafeCategory =
+        product.category === "Cleanser" ||
+        product.category === "Moisturizer" ||
+        product.category === "Sunscreen";
+
+      return (
+        isSafeCategory &&
+        !containsAnyTerm(productText, AGGRESSIVE_ACTIVE_TERMS)
+      );
+    });
+
+    const supportiveRoutine = {
+      AM: [
+        "Cleanser - daily - use a very gentle, non-stripping wash only if needed",
+        "Moisturizer - daily - use a bland barrier-supportive cream",
+        "Sunscreen - daily - use a gentle broad-spectrum sunscreen as the final step",
+      ],
+      PM: [
+        "Cleanser - daily - cleanse gently without scrubs, brushes, or active cleansers",
+        "Moisturizer - daily - use a barrier-supportive cream and avoid layering strong actives",
+      ],
+      weekly: [
+        "Daily base (AM): gentle cleanse only if needed, barrier moisturizer, sunscreen",
+        "Daily base (PM): gentle cleanse, barrier moisturizer, avoid exfoliants and strong treatment steps",
+        "Active cycle (Mon–Sun): Mon Barrier night | Tue Barrier night | Wed Barrier night | Thu Barrier night | Fri Barrier night | Sat Barrier night | Sun Barrier night",
+        "Ramp-up (4 weeks): Weeks 1–2 keep to supportive care only; Weeks 3–4 only add products if skin is calmer; Maintenance depends on clinician guidance or clear improvement",
+        "Rules: if irritation, pain, drainage, crusting, or rapid worsening is present, stop self-experimenting and seek in-person medical evaluation",
+      ],
+    };
+
+    const nextProducts = filteredProducts.slice(0, 3);
+    const nextIngredients = filteredIngredients.slice(0, 3);
+
+    return {
+      ...json,
+      skinType: {
+        ...json.skinType,
+        confidence: Math.min(json.skinType.confidence, 0.45),
+      },
+      explanation: {
+        skinTypeExplanation:
+          "The visible severity appears high enough that a standard cosmetic routine may not be the right primary answer. This plan stays supportive and low-risk rather than trying to aggressively treat the issue at home.",
+        productBenefits: [
+          "The routine focuses on minimizing extra irritation while maintaining basic cleansing, moisture, and sun protection.",
+          "It intentionally avoids aggressive actives because the visible severity may need clinician assessment rather than more experimentation.",
+        ],
+        layeringGuide: [
+          "Keep the routine to the fewest necessary steps and avoid stacking treatment products.",
+          "Use moisturizer after cleansing and keep sunscreen as the final morning layer.",
+          "Do not introduce exfoliants, peels, or strong acne actives unless a clinician specifically recommends them.",
+        ],
+      },
+      ingredients:
+        nextIngredients.length > 0
+          ? nextIngredients
+          : [
+              {
+                ingredient: "Ceramides",
+                reason: "Supports the barrier while keeping the routine low-risk.",
+                cautions: [],
+              },
+              {
+                ingredient: "Glycerin",
+                reason: "Helps with hydration without adding an aggressive treatment step.",
+                cautions: [],
+              },
+            ],
+      products: nextProducts,
+      routine: supportiveRoutine,
+      conflicts: [],
+      disclaimers: [
+        ...json.disclaimers,
+        "Visible severity may be beyond what over-the-counter skincare can reasonably address.",
+        "This result is a supportive care plan, not a substitute for medical evaluation.",
+      ],
+    };
+  }
+
   private buildSafeFallbackAnalysis(args: {
     prefs: {
       goals: string;
@@ -252,6 +443,11 @@ export class OpenAIService {
         ],
       },
       conflicts: [],
+      escalation: {
+        level: "monitor",
+        reason:
+          "The system could not produce a strong enough analysis to safely rule out the need for closer follow-up.",
+      },
       disclaimers: [
         "This fallback response was returned because the model pipeline could not produce a fully reliable structured analysis.",
         `Fallback reason: ${reason}`,
@@ -339,6 +535,7 @@ export class OpenAIService {
           "Avoid combining strong actives on the same night unless well tolerated."
         ),
       })),
+      escalation: this.deriveEscalationFromAnalysis(json),
       disclaimers: normalizeStringArray(json.disclaimers),
       timestamp: asNonEmptyString(json.timestamp) || new Date().toISOString(),
     };
@@ -606,6 +803,8 @@ EVIDENCE RULE:
 - For each concern, include visible evidence from the image.
 - If lighting, angle, or resolution limits confidence, state that.
 - Do not claim specific lesion types, pigmentation types, or irritation patterns unless they are visually supportable.
+- If the visible severity appears beyond what skincare alone is likely to help, set escalation.level to "medical_review" and explain why plainly.
+- For escalation.level="medical_review", do not give an aggressive treatment plan. Return a supportive care routine and make clear that in-person dermatology evaluation should be considered.
 
 OUTPUT RULES:
 - Return valid JSON only. No markdown. No prose outside the JSON.
@@ -637,6 +836,7 @@ Return JSON ONLY matching this exact shape:
     ]
   },
   "conflicts": [{"ingredients": ["...","..."], "warning": "..."}],
+  "escalation": { "level": "none|monitor|medical_review", "reason": "..." },
   "disclaimers": ["..."],
   "timestamp": "ISO-8601"
 }
@@ -646,6 +846,7 @@ FINAL CHECK BEFORE YOU ANSWER:
 - routine.weekly includes Daily base + Active cycle + Ramp-up + Rules
 - at least 4 product slots covered
 - include explanation.skinTypeExplanation, explanation.productBenefits, and explanation.layeringGuide
+- if escalation.level="medical_review", use a supportive-care routine instead of a normal optimization plan
 `;
   }
 
@@ -665,13 +866,14 @@ FINAL CHECK BEFORE YOU ANSWER:
     const productBenefitsLen = json?.explanation?.productBenefits?.length ?? 0;
     const layeringGuideLen = json?.explanation?.layeringGuide?.length ?? 0;
     const { minAm, minPm } = getRoutineLengthTargets(prefs);
+    const isMedicalReview = json.escalation?.level === "medical_review";
 
-    if (amLen < minAm || pmLen < minPm) {
+    if (!isMedicalReview && (amLen < minAm || pmLen < minPm)) {
       warnings.push(
         `Routine may be too thin for the selected intensity (AM=${amLen}, PM=${pmLen}).`
       );
     }
-    if ((weeklyArr?.length ?? 0) < 5) {
+    if (!isMedicalReview && (weeklyArr?.length ?? 0) < 5) {
       warnings.push("Weekly plan is lighter than target.");
     }
     if (
@@ -689,7 +891,7 @@ FINAL CHECK BEFORE YOU ANSWER:
     if (!weeklyText.includes("rules:")) {
       warnings.push("Weekly plan is missing pause or irritation rules.");
     }
-    if (productsLen < 4) {
+    if (!isMedicalReview && productsLen < 4) {
       warnings.push("Product coverage is narrower than target.");
     }
     if (!json?.explanation?.skinTypeExplanation?.trim()) {
@@ -866,6 +1068,8 @@ FINAL CHECK BEFORE YOU ANSWER:
       }
 
       logger.info("Validation success: response matches schema.");
+
+      json = this.applyEscalationGuardrails(json);
 
       const qualityWarnings = this.getQualityWarnings(json, userPreferences);
       try {

@@ -1,6 +1,7 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import type {
+  EscalationAssessment,
   IngredientConflict,
   IngredientRecommendation,
   ProductRecommendation,
@@ -64,6 +65,32 @@ function buildWhyRecommendation(
   return "These recommendations are structured to keep the routine simple, readable, and easier to follow.";
 }
 
+function getEscalationMeta(escalation?: EscalationAssessment) {
+  const level = escalation?.level ?? "none";
+
+  if (level === "medical_review") {
+    return {
+      toneClassName: "escalationMedical",
+      heading: "Medical Review Recommended",
+      copy:
+        escalation?.reason ||
+        "Visible severity may be beyond what an over-the-counter skincare routine can reliably address.",
+    };
+  }
+
+  if (level === "monitor") {
+    return {
+      toneClassName: "escalationMonitor",
+      heading: "Closer Monitoring Advised",
+      copy:
+        escalation?.reason ||
+        "A cautious routine is appropriate, and the skin should be monitored closely for worsening or lack of improvement.",
+    };
+  }
+
+  return null;
+}
+
 function SkinResult() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -93,6 +120,8 @@ function SkinResult() {
   const fallbackAnalysis = isFallbackAnalysis(analysis);
   const shouldReduceMotion = useReducedMotion();
   const whyRecommendation = buildWhyRecommendation(analysis, explanation);
+  const escalationMeta = getEscalationMeta(analysis.escalation);
+  const isMedicalReview = analysis.escalation?.level === "medical_review";
 
   const reveal = {
     hidden: shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 20 },
@@ -116,10 +145,13 @@ function SkinResult() {
       <motion.section className="resultsCard" variants={reveal}>
         <header className="resultsHeader">
           <p className="resultsEyebrow">SkinAI Results</p>
-          <h1 className="resultsTitle">Your skincare plan</h1>
+          <h1 className="resultsTitle">
+            {isMedicalReview ? "Supportive care plan" : "Your skincare plan"}
+          </h1>
           <p className="resultsIntro">
-            A structured summary of the visible concerns, routine steps, and
-            ingredients worth focusing on.
+            {isMedicalReview
+              ? "This result stays conservative because the visible severity may be beyond what a standard skincare routine should try to handle alone."
+              : "A structured summary of the visible concerns, routine steps, and ingredients worth focusing on."}
           </p>
         </header>
 
@@ -127,6 +159,23 @@ function SkinResult() {
           <div className="resultsWarning" role="alert" aria-live="polite">
             ⚠️ Unable to analyze input. Try adding more detail.
           </div>
+        ) : null}
+
+        {escalationMeta ? (
+          <section
+            className={`resultSection escalationCard ${escalationMeta.toneClassName}`}
+            role="alert"
+            aria-live="polite"
+          >
+            <h2>{escalationMeta.heading}</h2>
+            <p>{escalationMeta.copy}</p>
+            {isMedicalReview ? (
+              <p className="escalationSubcopy">
+                The routine below is intentionally supportive and low-risk. It
+                is not trying to aggressively treat the condition at home.
+              </p>
+            ) : null}
+          </section>
         ) : null}
 
         {imageDataUrl ? (
@@ -153,6 +202,16 @@ function SkinResult() {
               <span className="detailLabel">Severity</span>
               <span className="detailValue">
                 {primaryConcern?.severity || "Moderate"}
+              </span>
+            </div>
+            <div className="detailRow">
+              <span className="detailLabel">Escalation</span>
+              <span className="detailValue">
+                {analysis.escalation?.level === "medical_review"
+                  ? "Medical review"
+                  : analysis.escalation?.level === "monitor"
+                    ? "Monitor closely"
+                    : "None"}
               </span>
             </div>
           </div>

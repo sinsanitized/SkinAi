@@ -45,6 +45,11 @@ const ingredientConflictSchema = z.object({
   warning: z.string().min(1),
 });
 
+const escalationSchema = z.object({
+  level: z.enum(["none", "monitor", "medical_review"]),
+  reason: z.string().min(1),
+});
+
 export const skinAnalysisResponseSchema = z.object({
   skinType: skinTypeSchema,
   explanation: skinEducationSchema,
@@ -53,6 +58,7 @@ export const skinAnalysisResponseSchema = z.object({
   products: z.array(productRecommendationSchema),
   routine: routinePlanSchema,
   conflicts: z.array(ingredientConflictSchema),
+  escalation: escalationSchema,
   disclaimers: z.array(z.string()),
   timestamp: z.string().min(1),
 });
