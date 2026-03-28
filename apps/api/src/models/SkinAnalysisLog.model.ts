@@ -7,7 +7,12 @@ export interface SkinAnalysisLogDocument extends Document {
   retrievedContext: string[];
   metadata?: {
     model?: string;
-    processingTime?: number;
+    visionModel?: string;
+    embeddingModel?: string;
+    promptVersion?: string;
+    temperature?: number;
+    processingTimeMs?: number;
+    retryCount?: number;
     goals?: string;
     routineIntensity?: string;
 

@@ -1,36 +1,53 @@
 import mongoose from "mongoose";
+import { logger } from "../utils/logger";
+
+let connectionListenersRegistered = false;
 
 export async function connectDatabase() {
-    try {
-        const mongoUri = process.env.MONGODB_URI;
+  try {
+    const mongoUri = process.env.MONGODB_URI;
 
-        if (!mongoUri) {
-            throw new Error('MONGODB_URI is not defined in environment variables');
-        };
+    if (!mongoUri) {
+      throw new Error("MONGODB_URI is not defined in environment variables");
+    }
 
-        await mongoose.connect(mongoUri);
+    if (mongoose.connection.readyState === 1) {
+      return mongoose.connection;
+    }
 
-        console.log('MongoDB connected successfully');
+    const connection = await mongoose.connect(mongoUri, {
+      serverSelectionTimeoutMS: 10_000,
+    });
 
-        // Handle connection events
-        mongoose.connection.on('error', (error) => {
-            console.error('MongoDB connection error:', error);
-        });
+    if (!connectionListenersRegistered) {
+      mongoose.connection.on("error", (error) => {
+        logger.error("MongoDB connection error:", error);
+      });
 
-        mongoose.connection.on('disconnected', () => {
-            console.log('MongoDB disconnected');
-        });
-    } catch (error) {
-        console.error('Failed to connect to MongoDB:', error);
-        process.exit(1);
-    };
-};
+      mongoose.connection.on("disconnected", () => {
+        logger.warn("MongoDB disconnected");
+      });
+
+      connectionListenersRegistered = true;
+    }
+
+    logger.success("MongoDB connected successfully");
+    return connection.connection;
+  } catch (error) {
+    logger.error("Failed to connect to MongoDB:", error);
+    throw error;
+  }
+}
 
 export async function disconnectDatabase() {
-    try {
-        await mongoose.disconnect();
-        console.log('MongoDB disconnected');
-    } catch (error) {
-        console.error('Error disconnecting from MongoDB:', error);
-    };
-};
+  try {
+    if (mongoose.connection.readyState === 0) {
+      return;
+    }
+
+    await mongoose.disconnect();
+    logger.info("MongoDB disconnected");
+  } catch (error) {
+    logger.error("Error disconnecting from MongoDB:", error);
+  }
+}

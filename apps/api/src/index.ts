@@ -4,6 +4,7 @@ import cors from "cors";
 import skinRoutes from "./routes/skin.routes";
 import { errorHandler } from "./middleware/errorHandler";
 import { logger } from "./utils/logger";
+import { connectDatabase, disconnectDatabase } from "./config/database";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -54,8 +55,7 @@ async function startServer() {
       : "enabled";
 
     if (process.env.SKIP_DB !== "true") {
-      // Connect to MongoDB
-      // await connectDatabase();
+      await connectDatabase();
     }
 
     // Start listening
@@ -95,12 +95,14 @@ async function startServer() {
 }
 
 // Graceful shutdown
-process.on("SIGTERM", () => {
+process.on("SIGTERM", async () => {
   logger.info("SIGTERM received, shutting down gracefully...");
+  await disconnectDatabase();
   process.exit(0);
 });
-process.on("SIGINT", () => {
+process.on("SIGINT", async () => {
   logger.info("SIGINT received, shutting down gracefully...");
+  await disconnectDatabase();
   process.exit(0);
 });
 

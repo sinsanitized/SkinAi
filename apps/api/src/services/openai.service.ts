@@ -1,4 +1,4 @@
-import { getOpenAIClient } from "../config/openai";
+import { EMBEDDING_CONFIG, getOpenAIClient } from "../config/openai";
 import type {
   EscalationAssessment,
   EscalationLevel,
@@ -232,10 +232,6 @@ function extractJSON<T = any>(text: string): T | null {
     return null;
   }
 }
-
-const EMBEDDING_CONFIG = {
-  model: "text-embedding-3-large",
-} as const;
 
 export class OpenAIService {
   private deriveEscalationFromAnalysis(

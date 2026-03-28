@@ -1,5 +1,10 @@
 import OpenAI from "openai";
 
+export const EMBEDDING_CONFIG = {
+  model: "text-embedding-3-large",
+  dimension: 3072,
+} as const;
+
 export function getOpenAIClient() {
   const apiKey = process.env.OPENAI_API_KEY;
 
@@ -9,8 +14,3 @@ export function getOpenAIClient() {
 
   return new OpenAI({ apiKey });
 }
-
-// Optional: keep config constants here if you use embeddings
-export const EMBEDDING_CONFIG = {
-  model: "text-embedding-3-small",
-};

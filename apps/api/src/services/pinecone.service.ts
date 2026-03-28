@@ -10,6 +10,7 @@ interface SkinMetadata extends RecordMetadata {
 
 export class PineconeService {
   private index: Index<SkinMetadata> | null = null;
+  private indexReady: Promise<Index<SkinMetadata> | null> | null = null;
   private readonly MIN_RETRIEVAL_SCORE = 0.2;
 
   private isEnabled(): boolean {
@@ -20,25 +21,74 @@ export class PineconeService {
     return !!process.env.PINECONE_API_KEY;
   }
 
-  private getIndex(): Index<SkinMetadata> | null {
-    // Lazy initialization keeps the API usable in local/dev environments where
-    // retrieval is optional, while still enabling RAG in production deployments.
-    if (!this.isEnabled()) return null;
-    if (this.index) return this.index;
-
-    try {
-      const pinecone = getPineconeClient();
-      this.index = pinecone.index<SkinMetadata>(PINECONE_CONFIG.indexName);
-      return this.index;
-    } catch (err) {
-      console.warn("Pinecone init failed:", err);
-      this.index = null;
+  private async ensureIndex(): Promise<Index<SkinMetadata> | null> {
+    if (!this.isEnabled()) {
+      logger.info("Pinecone disabled via configuration.");
       return null;
     }
+    if (this.index) return this.index;
+    if (this.indexReady) return this.indexReady;
+
+    this.indexReady = (async () => {
+      try {
+        const pinecone = getPineconeClient();
+        let describedIndex;
+
+        try {
+          describedIndex = await pinecone.describeIndex(PINECONE_CONFIG.indexName);
+        } catch (err) {
+          logger.warn(
+            `Pinecone index "${PINECONE_CONFIG.indexName}" not found. Creating it automatically.`
+          );
+
+          await pinecone.createIndex({
+            name: PINECONE_CONFIG.indexName,
+            dimension: PINECONE_CONFIG.dimension,
+            metric: PINECONE_CONFIG.metric,
+            spec: {
+              serverless: {
+                cloud: PINECONE_CONFIG.cloud,
+                region: PINECONE_CONFIG.region,
+              },
+            },
+            suppressConflicts: true,
+            waitUntilReady: true,
+          });
+
+          describedIndex = await pinecone.describeIndex(PINECONE_CONFIG.indexName);
+        }
+
+        if (describedIndex.dimension !== PINECONE_CONFIG.dimension) {
+          throw new Error(
+            `Pinecone index dimension mismatch. Expected ${PINECONE_CONFIG.dimension}, got ${describedIndex.dimension}.`
+          );
+        }
+
+        if (!describedIndex.status?.ready) {
+          throw new Error(
+            `Pinecone index "${PINECONE_CONFIG.indexName}" is not ready yet.`
+          );
+        }
+
+        this.index = pinecone.index<SkinMetadata>(PINECONE_CONFIG.indexName);
+        logger.success(
+          `Pinecone index ready: ${PINECONE_CONFIG.indexName} (${describedIndex.dimension} dims)`
+        );
+        return this.index;
+      } catch (err) {
+        logger.warn("Pinecone init failed:", err);
+        this.index = null;
+        return null;
+      } finally {
+        this.indexReady = null;
+      }
+    })();
+
+    return this.indexReady;
   }
 
   async searchSimilarContext(embedding: number[]): Promise<string[]> {
-    const index = this.getIndex();
+    const index = await this.ensureIndex();
     if (!index) return [];
 
     try {
@@ -84,7 +134,7 @@ export class PineconeService {
     embedding: number[],
     summary: string
   ): Promise<void> {
-    const index = this.getIndex();
+    const index = await this.ensureIndex();
     if (!index) return;
 
     try {
@@ -107,7 +157,7 @@ export class PineconeService {
   }
 
   async checkIndexHealth(): Promise<boolean> {
-    const index = this.getIndex();
+    const index = await this.ensureIndex();
     if (!index) return false;
 
     try {
