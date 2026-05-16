@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { openAIService } from "./openai.service";
-import type { SkinAnalysisResponse } from "@skinai/shared-types";
+import type { SkinAnalysisRequest, SkinAnalysisResponse } from "@skinai/shared-types";
 
 function createAnalysis(
   overrides: Partial<SkinAnalysisResponse> = {}
@@ -168,5 +168,24 @@ describe("openAIService more-active strengthening", () => {
         step.includes("Fri Treatment night")
       )
     ).toBe(true);
+  });
+});
+
+describe("openAIService image usability fallback", () => {
+  it("returns a low-confidence fallback when the image is unusable", () => {
+    const prefs: SkinAnalysisRequest = {
+      goals: "acne marks",
+      routineIntensity: "balanced",
+    };
+
+    const fallback = openAIService.createImageUsabilityFallback(
+      prefs,
+      "No clearly visible human face was present in the image."
+    );
+
+    expect(fallback.skinType.confidence).toBeLessThan(0.2);
+    expect(fallback.products).toEqual([]);
+    expect(fallback.escalation.level).toBe("monitor");
+    expect(fallback.disclaimers.some((item) => item.includes("No reliable face"))).toBe(true);
   });
 });

@@ -4,11 +4,12 @@ export class ImageProcessingService {
   private readonly MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
   private readonly ALLOWED_FORMATS = ['jpeg', 'jpg', 'png', 'webp'];
   private readonly MAX_DIMENSION = 2048; // Max width/height
+  private readonly MIN_DIMENSION = 96; // Small images do not provide usable skin detail
 
   /**
    * Validate image format and size
    */
-  validateImage(buffer: Buffer, mimetype: string): void {
+  async validateImage(buffer: Buffer, mimetype: string): Promise<void> {
     // Check file size
     if (buffer.length > this.MAX_FILE_SIZE) {
       throw new Error(`Image too large. Max size is ${this.MAX_FILE_SIZE / 1024 / 1024}MB`);
@@ -19,6 +20,28 @@ export class ImageProcessingService {
     if (!this.ALLOWED_FORMATS.includes(format)) {
       throw new Error(`Invalid image format. Allowed: ${this.ALLOWED_FORMATS.join(', ')}`);
     };
+
+    try {
+      const metadata = await sharp(buffer).metadata();
+      if (!metadata.width || !metadata.height) {
+        throw new Error("Image dimensions could not be read");
+      }
+
+      if (
+        metadata.width < this.MIN_DIMENSION ||
+        metadata.height < this.MIN_DIMENSION
+      ) {
+        throw new Error(
+          `Image too small for reliable skin analysis. Minimum size is ${this.MIN_DIMENSION}x${this.MIN_DIMENSION}px`
+        );
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error;
+      }
+
+      throw new Error("Image could not be decoded for analysis");
+    }
   }
 
   /**

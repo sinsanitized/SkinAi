@@ -257,6 +257,13 @@ function hasConcern(
   return (concerns ?? []).some((concern) => targets.includes(concern.name));
 }
 
+interface ImageUsabilityAssessment {
+  usable: boolean;
+  faceVisible: boolean;
+  confidence: number;
+  reason: string;
+}
+
 /**
  * Helper function to safely extract JSON from LLM responses.
  * More reliable than a greedy regex: takes the first "{" and last "}".
@@ -275,6 +282,133 @@ function extractJSON<T = unknown>(text: string): T | null {
 }
 
 export class OpenAIService {
+  createImageUsabilityFallback(
+    prefs: SkinAnalysisRequest,
+    reason: string
+  ): SkinAnalysisResponse {
+    return {
+      skinType: {
+        type: "Sensitive-leaning",
+        confidence: 0.1,
+      },
+      explanation: {
+        skinTypeExplanation:
+          "The uploaded image did not provide a clear enough face or visible skin surface to support a reliable skincare analysis.",
+        productBenefits: [
+          "No treatment plan was generated because the visible evidence was not strong enough to support one responsibly.",
+          prefs.goals
+            ? `Your reported goal of "${prefs.goals}" could not be matched against clearly visible skin findings in this image.`
+            : "A clearer image is needed before making targeted skincare recommendations.",
+        ],
+        layeringGuide: [
+          "Retake the photo in even lighting with the full face visible and in focus.",
+          "Avoid heavy filters, extreme shadows, or very distant framing.",
+          "Once the image is clearer, the system can provide a more targeted routine.",
+        ],
+      },
+      concerns: [],
+      ingredients: [],
+      products: [],
+      routine: {
+        AM: [],
+        PM: [],
+        weekly: [
+          "Daily base (AM): retake the photo in even lighting before relying on analysis-driven recommendations",
+          "Daily base (PM): avoid adding new aggressive actives based on this image alone",
+          "Active cycle (Mon–Sun): Mon Retake image | Tue Retake image if needed | Wed Retake image | Thu Retake image if needed | Fri Retake image | Sat Retake image if needed | Sun Retake image",
+          "Ramp-up (4 weeks): Weeks 1–2 use a clearer, front-facing image; Weeks 3–4 compare follow-up photos only after a reliable baseline exists; Maintenance repeat analysis only with usable images",
+          "Rules: if the image does not show the full face clearly, do not trust a targeted skincare routine from it",
+        ],
+      },
+      conflicts: [],
+      escalation: {
+        level: "monitor",
+        reason:
+          "The image quality was too weak to safely rule in a targeted plan or rule out the need for closer follow-up.",
+      },
+      disclaimers: [
+        "No reliable face or skin-surface analysis could be completed from this image.",
+        `Image usability reason: ${reason}`,
+        "This is not medical advice.",
+      ],
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  async assessImageUsability(
+    imageBase64: string,
+    mimeType: string
+  ): Promise<ImageUsabilityAssessment> {
+    const openai = getOpenAIClient();
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You judge whether an uploaded image is usable for visible facial skin analysis. Be strict about face visibility, focus, framing, and visible skin area. Return JSON only.",
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `
+Determine whether this image is usable for facial skin analysis.
+
+Return JSON only with this exact shape:
+{
+  "usable": true,
+  "faceVisible": true,
+  "confidence": 0.0,
+  "reason": "..."
+}
+
+Rules:
+- usable=false if there is no clearly visible human face.
+- usable=false if the face is too small, too blurred, too dark, too cropped, heavily filtered, or does not show enough skin surface.
+- usable=false if the image is blank, abstract, a product shot, an illustration, or otherwise not a real facial skin photo.
+- Use a short reason grounded in what is visibly missing.
+`,
+            },
+            {
+              type: "image_url",
+              image_url: { url: `data:${mimeType};base64,${imageBase64}` },
+            },
+          ],
+        },
+      ],
+      temperature: 0.1,
+      max_tokens: 200,
+    });
+
+    const text = response.choices?.[0]?.message?.content || "";
+    const parsed = extractJSON<Partial<ImageUsabilityAssessment>>(text);
+
+    if (!parsed) {
+      logger.warn("Image usability check returned malformed JSON. Proceeding with analysis.");
+      return {
+        usable: true,
+        faceVisible: true,
+        confidence: 0.5,
+        reason: "Image usability could not be reliably assessed before analysis.",
+      };
+    }
+
+    return {
+      usable: parsed.usable !== false,
+      faceVisible: parsed.faceVisible !== false,
+      confidence: normalizeConfidenceValue(parsed.confidence, 0.5),
+      reason: asNonEmptyString(
+        parsed.reason,
+        parsed.usable === false
+          ? "The image did not show a clear, analyzable face."
+          : "The image appeared usable for analysis."
+      ),
+    };
+  }
+
   private deriveEscalationFromAnalysis(
     json: Partial<SkinAnalysisResponse>
   ): EscalationAssessment {

@@ -59,11 +59,39 @@ export class SkinController {
       const sensitiveMode = req.body.sensitiveMode === "true";
 
       // 1) Validate + process image
-      imageProcessingService.validateImage(file.buffer, file.mimetype);
+      await imageProcessingService.validateImage(file.buffer, file.mimetype);
       const { buffer: processedBuffer, mimeType } =
         await imageProcessingService.processImage(file.buffer);
       const base64Image =
         imageProcessingService.bufferToBase64(processedBuffer);
+
+      const userPrefs: SkinAnalysisRequest = {
+        goals,
+        routineIntensity,
+        fragranceFree,
+        pregnancySafe,
+        sensitiveMode,
+      };
+
+      const usabilityAssessment = await openAIService.assessImageUsability(
+        base64Image,
+        mimeType
+      );
+
+      if (!usabilityAssessment.usable) {
+        const fallback =
+          openAIService.createImageUsabilityFallback(
+            userPrefs,
+            usabilityAssessment.reason
+          );
+
+        res.json({
+          success: true,
+          data: fallback,
+          message: "Image was not suitable for reliable skin analysis",
+        } as ApiResponse<SkinAnalysisResponse>);
+        return;
+      }
 
       // 2) Embedding for optional retrieval / progress tracking
       let embedding: number[] = [];
@@ -90,14 +118,6 @@ export class SkinController {
       }
 
       // 4) AI skin analysis (structured JSON)
-      const userPrefs: SkinAnalysisRequest = {
-        goals,
-        routineIntensity,
-        fragranceFree,
-        pregnancySafe,
-        sensitiveMode,
-      };
-
       const analysis = await openAIService.generateSkinAnalysis({
         imageBase64: base64Image,
         mimeType,
@@ -151,12 +171,27 @@ export class SkinController {
         message: "Skin analysis completed",
       } as ApiResponse<SkinAnalysisResponse>);
     } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+
+      if (
+        message.includes("Image too large") ||
+        message.includes("Invalid image format") ||
+        message.includes("Image too small") ||
+        message.includes("could not be decoded")
+      ) {
+        res.status(400).json({
+          success: false,
+          error: message,
+        } as ApiResponse<never>);
+        return;
+      }
+
       console.error("❌ Error analyzing skin:", error);
 
       res.status(500).json({
         success: false,
         error: "Failed to analyze skin",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: message,
       } as ApiResponse<never>);
     }
   }
