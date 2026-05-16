@@ -122,6 +122,19 @@ const TREATMENT_ACTIVE_TERMS = [
   "mandelic",
   "lactic acid",
 ] as const;
+const GENERIC_PRODUCT_NAME_TERMS = [
+  "cleanser",
+  "cleansing foam",
+  "cleaning foam",
+  "foam cleanser",
+  "moisturizer",
+  "gel cream",
+  "cream",
+  "serum",
+  "sunscreen",
+  "spf",
+  "spot treatment",
+] as const;
 
 function getRoutineLengthTargets(prefs: {
   routineIntensity: RoutineIntensity;
@@ -191,11 +204,92 @@ function normalizeStringArray(value: unknown): string[] {
   return single ? [single] : [];
 }
 
-function normalizeConcernName(value: unknown): SkinConcern["name"] {
+function inferConcernNameFromText(text: string): SkinConcern["name"] {
+  const normalized = text.toLowerCase();
+
+  if (
+    containsAnyTerm(normalized, [
+      "cyst",
+      "nodule",
+      "papule",
+      "pustule",
+      "inflamed lesion",
+      "inflamed bump",
+      "breakout",
+      "acne",
+    ])
+  ) {
+    return "Inflammatory acne";
+  }
+
+  if (
+    containsAnyTerm(normalized, [
+      "comedone",
+      "blackhead",
+      "whitehead",
+      "clogged pore",
+      "closed comed",
+      "open comed",
+    ])
+  ) {
+    return "Comedonal acne";
+  }
+
+  if (
+    containsAnyTerm(normalized, [
+      "hyperpigmentation",
+      "dark mark",
+      "brown mark",
+      "post-inflammatory pigmentation",
+      "post inflammatory pigmentation",
+    ])
+  ) {
+    return "Post-inflammatory hyperpigmentation (PIH)";
+  }
+
+  if (
+    containsAnyTerm(normalized, [
+      "erythema",
+      "red mark",
+      "post-inflammatory erythema",
+      "post inflammatory erythema",
+    ])
+  ) {
+    return "Post-inflammatory erythema (PIE)";
+  }
+
+  if (containsAnyTerm(normalized, ["redness", "irritation", "inflamed", "reactive"])) {
+    return "Redness / irritation";
+  }
+
+  if (containsAnyTerm(normalized, ["dehydrat", "dry", "flak", "tight"])) {
+    return "Dehydration";
+  }
+
+  if (containsAnyTerm(normalized, ["oil", "sebum", "shine", "greasy"])) {
+    return "Excess oil / sebum";
+  }
+
+  if (containsAnyTerm(normalized, ["texture", "uneven", "clogged", "pore"])) {
+    return "Texture / clogged pores";
+  }
+
+  if (containsAnyTerm(normalized, ["dark circle", "under-eye", "under eye"])) {
+    return "Dark circles";
+  }
+
+  if (containsAnyTerm(normalized, ["fine line", "wrinkle"])) {
+    return "Fine lines";
+  }
+
+  return "Barrier impairment";
+}
+
+function normalizeConcernName(value: unknown, evidence?: unknown): SkinConcern["name"] {
   const normalized = asNonEmptyString(value);
   return VALID_CONCERN_NAMES.has(normalized as SkinConcern["name"])
     ? (normalized as SkinConcern["name"])
-    : "Barrier impairment";
+    : inferConcernNameFromText(`${normalized} ${asNonEmptyString(evidence)}`);
 }
 
 function normalizeProductCategory(
@@ -255,6 +349,12 @@ function hasConcern(
   targets: SkinConcern["name"][]
 ): boolean {
   return (concerns ?? []).some((concern) => targets.includes(concern.name));
+}
+
+function isWeakProductName(name: string): boolean {
+  const normalized = name.trim().toLowerCase();
+  if (normalized.length < 6) return true;
+  return GENERIC_PRODUCT_NAME_TERMS.some((term) => normalized === term);
 }
 
 interface ImageUsabilityAssessment {
@@ -479,9 +579,11 @@ Rules:
         product.category === "Cleanser" ||
         product.category === "Moisturizer" ||
         product.category === "Sunscreen";
+      const hasSpecificName = !isWeakProductName(product.name);
 
       return (
         isSafeCategory &&
+        hasSpecificName &&
         !containsAnyTerm(productText, AGGRESSIVE_ACTIVE_TERMS)
       );
     });
@@ -671,7 +773,7 @@ Rules:
         weekly: normalizeStringArray(json.routine?.weekly),
       },
       concerns: (Array.isArray(json.concerns) ? json.concerns : []).map((concern) => ({
-        name: normalizeConcernName(concern?.name),
+        name: normalizeConcernName(concern?.name, concern?.evidence),
         severity: normalizeSeverity(concern?.severity),
         confidence: normalizeConfidenceValue(concern?.confidence, 0.5),
         evidence: asNonEmptyString(concern?.evidence) || undefined,
@@ -710,7 +812,7 @@ Rules:
       })),
       escalation: this.deriveEscalationFromAnalysis(json),
       disclaimers: normalizeStringArray(json.disclaimers),
-      timestamp: asNonEmptyString(json.timestamp) || new Date().toISOString(),
+      timestamp: new Date().toISOString(),
     };
   }
 

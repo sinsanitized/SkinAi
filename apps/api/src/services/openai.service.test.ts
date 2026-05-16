@@ -189,3 +189,79 @@ describe("openAIService image usability fallback", () => {
     expect(fallback.disclaimers.some((item) => item.includes("No reliable face"))).toBe(true);
   });
 });
+
+describe("openAIService normalization", () => {
+  it("maps unsupported concern labels to the closest supported concern using evidence", () => {
+    const normalized = (openAIService as unknown as {
+      normalizeAnalysisResponse: (json: SkinAnalysisResponse) => SkinAnalysisResponse;
+    }).normalizeAnalysisResponse(
+      createAnalysis({
+        concerns: [
+          {
+            name: "Severe nodulocystic acne" as SkinAnalysisResponse["concerns"][number]["name"],
+            severity: "Severe",
+            confidence: 0.88,
+            evidence: "Large inflamed cystic lesions and scarring are visible on the cheeks.",
+          },
+        ],
+      })
+    );
+
+    expect(normalized.concerns[0]?.name).toBe("Inflammatory acne");
+  });
+
+  it("replaces model timestamps with a fresh server timestamp", () => {
+    const normalized = (openAIService as unknown as {
+      normalizeAnalysisResponse: (json: SkinAnalysisResponse) => SkinAnalysisResponse;
+    }).normalizeAnalysisResponse(
+      createAnalysis({
+        timestamp: "2023-10-05T12:00:00Z",
+      })
+    );
+
+    expect(normalized.timestamp).not.toBe("2023-10-05T12:00:00Z");
+    expect(Number.isNaN(Date.parse(normalized.timestamp))).toBe(false);
+  });
+});
+
+describe("openAIService medical-review cleanup", () => {
+  it("drops weak generic product names in supportive-care outputs", () => {
+    const cleaned = (openAIService as unknown as {
+      applyEscalationGuardrails: (
+        json: SkinAnalysisResponse
+      ) => SkinAnalysisResponse;
+    }).applyEscalationGuardrails(
+      createAnalysis({
+        escalation: {
+          level: "medical_review",
+          reason: "Visible severe acne and scarring may require professional evaluation.",
+        },
+        products: [
+          {
+            name: "Cleansing Foam",
+            brand: "COSRX",
+            category: "Cleanser",
+            why: "Generic cleanser",
+            howToUse: "Use daily",
+            cautions: [],
+            tags: [],
+          },
+          {
+            name: "Toleriane Hydrating Gentle Cleanser",
+            brand: "La Roche-Posay",
+            category: "Cleanser",
+            why: "Supportive option",
+            howToUse: "Use daily",
+            cautions: [],
+            tags: [],
+          },
+        ],
+      })
+    );
+
+    expect(
+      cleaned.products.some((product) => product.name === "Cleansing Foam")
+    ).toBe(false);
+    expect(cleaned.products.length).toBeLessThanOrEqual(1);
+  });
+});
