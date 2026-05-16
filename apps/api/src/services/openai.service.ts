@@ -442,6 +442,16 @@ function isWeakCosmeticOnlyEvidence(evidence: string): boolean {
   );
 }
 
+function isMaintenanceMode(json: SkinAnalysisResponse): boolean {
+  return json.disclaimers.some((item) =>
+    item.includes("Low-concern maintenance mode was applied")
+  );
+}
+
+function formatWeeklyBase(prefix: "Daily base (AM)" | "Daily base (PM)", steps: string[]): string {
+  return `${prefix}: ${steps.join(", ")}`;
+}
+
 interface ImageUsabilityAssessment {
   usable: boolean;
   faceVisible: boolean;
@@ -1103,6 +1113,11 @@ Rules:
           "The routine focuses on maintaining hydration, barrier stability, and daily UV protection without adding unnecessary actives.",
           "A lighter maintenance plan reduces the chance of creating irritation on skin that already appears relatively stable.",
         ],
+        layeringGuide: [
+          "Cleanser comes first to remove sunscreen, surface oil, and debris without overcomplicating the routine.",
+          "Use moisturizer after cleansing to maintain hydration and support the skin barrier.",
+          "In the morning, sunscreen should stay as the final step every day.",
+        ],
       },
       disclaimers: [
         ...json.disclaimers,
@@ -1131,6 +1146,14 @@ Rules:
       next.routine.PM = next.routine.PM.filter(
         (step) => !containsAnyTerm(step.toLowerCase(), TREATMENT_ACTIVE_TERMS)
       );
+
+      const hasSerumProduct = next.products.some(
+        (product) => product.category === "Serum"
+      );
+      if (!hasSerumProduct) {
+        next.routine.AM = ["Cleanser", "Moisturizer", "Sunscreen"];
+        next.routine.PM = ["Cleanser", "Moisturizer"];
+      }
     }
 
     const desiredActiveCycle =
@@ -1146,8 +1169,21 @@ Rules:
 
     const currentWeekly = next.routine.weekly ?? [];
     next.routine.weekly = currentWeekly
-      .filter((step) => !step.startsWith("Active cycle (Mon–Sun):") && !step.startsWith("Ramp-up (4 weeks):") && !step.startsWith("Rules:"))
-      .concat([desiredActiveCycle, desiredRamp, desiredRules]);
+      .filter(
+        (step) =>
+          !step.startsWith("Daily base (AM):") &&
+          !step.startsWith("Daily base (PM):") &&
+          !step.startsWith("Active cycle (Mon–Sun):") &&
+          !step.startsWith("Ramp-up (4 weeks):") &&
+          !step.startsWith("Rules:")
+      )
+      .concat([
+        formatWeeklyBase("Daily base (AM)", next.routine.AM),
+        formatWeeklyBase("Daily base (PM)", next.routine.PM),
+        desiredActiveCycle,
+        desiredRamp,
+        desiredRules,
+      ]);
 
     return next;
   }
@@ -1481,8 +1517,9 @@ FINAL CHECK BEFORE YOU ANSWER:
     const layeringGuideLen = json?.explanation?.layeringGuide?.length ?? 0;
     const { minAm, minPm } = getRoutineLengthTargets(prefs);
     const isMedicalReview = json.escalation?.level === "medical_review";
+    const maintenanceMode = isMaintenanceMode(json);
 
-    if (!isMedicalReview && (amLen < minAm || pmLen < minPm)) {
+    if (!isMedicalReview && !maintenanceMode && (amLen < minAm || pmLen < minPm)) {
       warnings.push(
         `Routine may be too thin for the selected intensity (AM=${amLen}, PM=${pmLen}).`
       );
@@ -1505,7 +1542,7 @@ FINAL CHECK BEFORE YOU ANSWER:
     if (!weeklyText.includes("rules:")) {
       warnings.push("Weekly plan is missing pause or irritation rules.");
     }
-    if (!isMedicalReview && productsLen < 4) {
+    if (!isMedicalReview && !maintenanceMode && productsLen < 4) {
       warnings.push("Product coverage is narrower than target.");
     }
     if (!json?.explanation?.skinTypeExplanation?.trim()) {

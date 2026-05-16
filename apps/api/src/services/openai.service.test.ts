@@ -336,6 +336,10 @@ describe("openAIService low-concern maintenance mode", () => {
     );
 
     expect(lightened.concerns).toEqual([]);
+    expect(lightened.routine.AM).toEqual(["Cleanser", "Moisturizer", "Sunscreen"]);
+    expect(lightened.routine.PM).toEqual(["Cleanser", "Moisturizer"]);
+    expect(lightened.routine.weekly?.[0]).toBe("Daily base (AM): Cleanser, Moisturizer, Sunscreen");
+    expect(lightened.routine.weekly?.[1]).toBe("Daily base (PM): Cleanser, Moisturizer");
     expect(
       (lightened.routine.weekly ?? []).some((step) =>
         step.includes("Maintenance night")
@@ -346,6 +350,82 @@ describe("openAIService low-concern maintenance mode", () => {
         item.includes("Low-concern maintenance mode")
       )
     ).toBe(true);
+  });
+});
+
+describe("openAIService maintenance-mode quality warnings", () => {
+  it("does not warn that maintenance-mode plans are too thin or under-covered", () => {
+    const warnings = (openAIService as unknown as {
+      getQualityWarnings: (
+        json: SkinAnalysisResponse,
+        prefs: {
+          routineIntensity: "minimal" | "balanced" | "more_active";
+          sensitiveMode: boolean;
+        }
+      ) => string[];
+    }).getQualityWarnings(
+      createAnalysis({
+        skinType: {
+          type: "Normal",
+          confidence: 0.75,
+        },
+        concerns: [],
+        products: [
+          {
+            name: "Gentle Hydrating Cleanser",
+            brand: "COSRX",
+            category: "Cleanser",
+            why: "Gentle cleanse",
+            howToUse: "Use daily",
+            cautions: [],
+            tags: [],
+          },
+          {
+            name: "Moisturizing Cream",
+            brand: "Etude House",
+            category: "Moisturizer",
+            why: "Hydration",
+            howToUse: "Use daily",
+            cautions: [],
+            tags: [],
+          },
+          {
+            name: "Daily Sunscreen SPF 50",
+            brand: "Missha",
+            category: "Sunscreen",
+            why: "UV protection",
+            howToUse: "Use daily",
+            cautions: [],
+            tags: [],
+          },
+        ],
+        routine: {
+          AM: ["Cleanser", "Moisturizer", "Sunscreen"],
+          PM: ["Cleanser", "Moisturizer"],
+          weekly: [
+            "Daily base (AM): Cleanser, Moisturizer, Sunscreen",
+            "Daily base (PM): Cleanser, Moisturizer",
+            "Active cycle (Mon–Sun): Mon Maintenance night | Tue Barrier night | Wed Maintenance night | Thu Barrier night | Fri Maintenance night | Sat Barrier night | Sun Barrier night",
+            "Ramp-up (4 weeks): Weeks 1–2 keep the base routine consistent; Weeks 3–4 add only one optional brightening step if desired; Maintenance stay with a low-irritation maintenance rhythm",
+            "Rules: if the skin stays clear and comfortable, prioritize consistency over adding stronger treatment products.",
+          ],
+        },
+        disclaimers: [
+          "Low-concern maintenance mode was applied because the visible findings appeared minimal.",
+        ],
+      }),
+      {
+        routineIntensity: "balanced",
+        sensitiveMode: false,
+      }
+    );
+
+    expect(
+      warnings.some((warning) => warning.includes("Routine may be too thin"))
+    ).toBe(false);
+    expect(
+      warnings.some((warning) => warning.includes("Product coverage is narrower"))
+    ).toBe(false);
   });
 });
 
