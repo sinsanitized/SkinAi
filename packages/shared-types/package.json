@@ -7,8 +7,9 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc -b",
+    "lint": "eslint --config ../../eslint.config.mjs \"../../packages/shared-types/src/**/*.ts\"",
     "type-check": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run"
   },
   "devDependencies": {
     "typescript": "~5.9.3",

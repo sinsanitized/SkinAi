@@ -25,7 +25,7 @@ export class SkinController {
     const startTime = Date.now();
 
     try {
-      const file = (req as any).file;
+      const file = req.file;
       if (!file) {
         res.status(400).json({
           success: false,
@@ -124,8 +124,10 @@ export class SkinController {
               sensitiveMode,
             },
           });
-        } catch (err: any) {
-          console.warn("⚠️ Failed to save analysis log:", err?.message ?? err);
+        } catch (error: unknown) {
+          const message =
+            error instanceof Error ? error.message : "Unknown persistence error";
+          console.warn("⚠️ Failed to save analysis log:", message);
         }
       }
 
@@ -171,7 +173,7 @@ export class SkinController {
           timestamp: new Date().toISOString(),
         },
       });
-    } catch (error) {
+    } catch {
       res.status(500).json({ success: false, error: "Health check failed" });
     }
   }

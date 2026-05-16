@@ -1,5 +1,6 @@
 import type {
   ApiResponse,
+  ErrorResponse,
   RoutineIntensity,
   SkinAnalysisRequest,
   SkinAnalysisResponse,
@@ -8,6 +9,27 @@ import type {
 // In dev, use Vite proxy by default (same-origin).
 // In prod, set VITE_API_URL (e.g. https://api.yourdomain.com)
 const API_URL = import.meta.env.VITE_API_URL || "";
+
+function parseApiResponse(
+  text: string
+): ApiResponse<SkinAnalysisResponse> | ErrorResponse | null {
+  try {
+    return JSON.parse(text) as ApiResponse<SkinAnalysisResponse> | ErrorResponse;
+  } catch {
+    return null;
+  }
+}
+
+function getApiErrorMessage(
+  data: ApiResponse<SkinAnalysisResponse> | ErrorResponse | null,
+  fallback: string
+): string {
+  if (data && "error" in data && typeof data.error === "string") {
+    return data.error;
+  }
+
+  return fallback;
+}
 
 export class SkinAnalysisApi {
   async analyzeSkin(
@@ -48,21 +70,14 @@ export class SkinAnalysisApi {
 
     // If server returned non-JSON, avoid crashing on response.json()
     const text = await response.text();
-    let data: ApiResponse<SkinAnalysisResponse> | null = null;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      data = null;
-    }
+    const data = parseApiResponse(text);
 
     if (!response.ok) {
-      throw new Error(
-        (data as any)?.error || text || `Request failed (${response.status})`
-      );
+      throw new Error(getApiErrorMessage(data, text || `Request failed (${response.status})`));
     }
 
-    if (!data?.success) {
-      throw new Error(data?.error || "Failed to analyze skin");
+    if (!data || !("success" in data) || !data.success) {
+      throw new Error(getApiErrorMessage(data, "Failed to analyze skin"));
     }
 
     if (!data.data) throw new Error("No data received from server");
@@ -72,8 +87,12 @@ export class SkinAnalysisApi {
   async healthCheck(): Promise<boolean> {
     try {
       const response = await fetch(`${API_URL}/api/health`);
-      const data: ApiResponse<any> = await response.json();
-      return !!data.success;
+      const data = (await response.json()) as ApiResponse<{
+        status: string;
+        pinecone: boolean;
+        timestamp: string;
+      }>;
+      return data.success === true;
     } catch {
       return false;
     }

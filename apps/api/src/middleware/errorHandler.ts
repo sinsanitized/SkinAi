@@ -7,6 +7,7 @@ export function errorHandler(
   res: Response,
   _next: NextFunction
 ): void {
+  void _next;
   console.error('❌ Error:', error);
 
   res.status(500).json({

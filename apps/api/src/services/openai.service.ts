@@ -220,7 +220,7 @@ function normalizeEscalationLevel(value: unknown): EscalationLevel {
  * Helper function to safely extract JSON from LLM responses.
  * More reliable than a greedy regex: takes the first "{" and last "}".
  */
-function extractJSON<T = any>(text: string): T | null {
+function extractJSON<T = unknown>(text: string): T | null {
   try {
     const start = text.indexOf("{");
     const end = text.lastIndexOf("}");
@@ -858,7 +858,7 @@ FINAL CHECK BEFORE YOU ANSWER:
     const pmLen = json?.routine?.PM?.length ?? 0;
     const weeklyArr = json?.routine?.weekly ?? [];
     const weeklyText = weeklyArr.join(" ").toLowerCase();
-    const productsLen = (json as any)?.products?.length ?? 0;
+    const productsLen = json.products?.length ?? 0;
     const productBenefitsLen = json?.explanation?.productBenefits?.length ?? 0;
     const layeringGuideLen = json?.explanation?.layeringGuide?.length ?? 0;
     const { minAm, minPm } = getRoutineLengthTargets(prefs);

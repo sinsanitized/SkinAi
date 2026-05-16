@@ -5,7 +5,7 @@ export function validateImageUploadRequest(
   res: Response,
   next: NextFunction
 ): void {
-  const file = (req as any).file;
+  const file = req.file;
 
   if (!file) {
     res.status(400).json({

@@ -6,6 +6,20 @@ interface Props {
   onRemove?: () => void;
 }
 
+function getWebcamErrorMessage(error: unknown): string {
+  if (error instanceof DOMException) {
+    if (error.name === "NotAllowedError") {
+      return "Camera permission denied. Please allow camera access.";
+    }
+
+    if (error.name === "NotFoundError") {
+      return "No camera device found.";
+    }
+  }
+
+  return "Could not access the camera.";
+}
+
 export const ImageUpload: React.FC<Props> = ({
   onImagesSelected,
   onRemove,
@@ -134,14 +148,8 @@ export const ImageUpload: React.FC<Props> = ({
       streamRef.current = stream;
       // IMPORTANT: show the webcam UI first so the <video> mounts
       setShowWebcam(true);
-    } catch (err: any) {
-      setWebcamError(
-        err?.name === "NotAllowedError"
-          ? "Camera permission denied. Please allow camera access."
-          : err?.name === "NotFoundError"
-          ? "No camera device found."
-          : "Could not access the camera."
-      );
+    } catch (error: unknown) {
+      setWebcamError(getWebcamErrorMessage(error));
       setShowWebcam(false);
     }
   };
@@ -192,8 +200,8 @@ export const ImageUpload: React.FC<Props> = ({
         await Promise.resolve();
 
         await video.play();
-      } catch (err: any) {
-        console.warn("Video play failed:", err);
+      } catch (error: unknown) {
+        console.warn("Video play failed:", error);
         setWebcamError(
           "Webcam started, but playback was blocked. Try allowing autoplay or click Capture after it appears."
         );

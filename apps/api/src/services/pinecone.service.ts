@@ -8,6 +8,11 @@ interface SkinMetadata extends RecordMetadata {
   createdAt: string;
 }
 
+function readSummaryFromMetadata(metadata?: RecordMetadata): string | undefined {
+  const summary = metadata?.["summary"];
+  return typeof summary === "string" ? summary : undefined;
+}
+
 export class PineconeService {
   private index: Index<SkinMetadata> | null = null;
   private indexReady: Promise<Index<SkinMetadata> | null> | null = null;
@@ -36,7 +41,7 @@ export class PineconeService {
 
         try {
           describedIndex = await pinecone.describeIndex(PINECONE_CONFIG.indexName);
-        } catch (err) {
+        } catch {
           logger.warn(
             `Pinecone index "${PINECONE_CONFIG.indexName}" not found. Creating it automatically.`
           );
@@ -103,9 +108,7 @@ export class PineconeService {
       const summaries =
         queryResponse.matches
           ?.filter((match) => {
-            const summary = (match.metadata as any)?.summary as
-              | string
-              | undefined;
+            const summary = readSummaryFromMetadata(match.metadata);
             const score = match.score ?? 0;
 
             return (
@@ -114,7 +117,7 @@ export class PineconeService {
               score >= this.MIN_RETRIEVAL_SCORE
             );
           })
-          .map((match) => (match.metadata as any).summary as string) || [];
+          .map((match) => readSummaryFromMetadata(match.metadata) as string) || [];
 
       if (!summaries.length) {
         logger.info(

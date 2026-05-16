@@ -1,4 +1,5 @@
 import { motion, useReducedMotion } from "framer-motion";
+import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type {
   EscalationAssessment,
@@ -10,8 +11,6 @@ import type {
   SkinEducation,
 } from "@skinai/shared-types";
 import "./SkinResult.css";
-
-const RESULT_STORAGE_KEY = "skinai:last-result";
 
 interface SkinResultNavigationState {
   analysis: SkinAnalysisResponse;
@@ -94,22 +93,19 @@ function getEscalationMeta(escalation?: EscalationAssessment) {
 function SkinResult() {
   const location = useLocation();
   const navigate = useNavigate();
+  const shouldReduceMotion = useReducedMotion();
   const navigationState = location.state as
     | SkinResultNavigationState
     | undefined;
-  const storedState = (() => {
-    const raw = sessionStorage.getItem(RESULT_STORAGE_KEY);
-    if (!raw) return undefined;
-    try {
-      return JSON.parse(raw) as SkinResultNavigationState;
-    } catch {
-      return undefined;
+  const state = navigationState;
+
+  useEffect(() => {
+    if (!state) {
+      navigate("/", { replace: true });
     }
-  })();
-  const state = navigationState ?? storedState;
+  }, [navigate, state]);
 
   if (!state) {
-    navigate("/");
     return null;
   }
 
@@ -118,7 +114,6 @@ function SkinResult() {
   const confidence = getConfidenceMeta(analysis.skinType.confidence);
   const primaryConcern = analysis.concerns?.[0];
   const fallbackAnalysis = isFallbackAnalysis(analysis);
-  const shouldReduceMotion = useReducedMotion();
   const whyRecommendation = buildWhyRecommendation(analysis, explanation);
   const escalationMeta = getEscalationMeta(analysis.escalation);
   const isMedicalReview = analysis.escalation?.level === "medical_review";

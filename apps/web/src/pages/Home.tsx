@@ -9,7 +9,6 @@ import type {
 } from "@skinai/shared-types";
 import "./Home.css";
 
-const RESULT_STORAGE_KEY = "skinai:last-result";
 const ROUTINE_INTENSITY_STEPS: RoutineIntensity[] = [
   "minimal",
   "balanced",
@@ -49,6 +48,14 @@ function resolveRoutineIntensity(
     : "balanced";
 }
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return "Failed to analyze skin";
+}
+
 function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -75,15 +82,6 @@ function Home() {
       const analysis = await skinAnalysisApi.analyzeSkin(file, analysisOptions);
       const imageDataUrl = await fileToDataUrl(file);
 
-      sessionStorage.setItem(
-        RESULT_STORAGE_KEY,
-        JSON.stringify({
-          analysis,
-          analysisOptions,
-          imageDataUrl,
-        }),
-      );
-
       setLoading(false);
 
       navigate("/result", {
@@ -93,10 +91,10 @@ function Home() {
           imageDataUrl,
         },
       });
-    } catch (err: any) {
+    } catch (error: unknown) {
       setLoading(false);
-      console.error(err);
-      setErrorMessage(err?.message || "Failed to analyze skin");
+      console.error(error);
+      setErrorMessage(getErrorMessage(error));
     }
   };
 

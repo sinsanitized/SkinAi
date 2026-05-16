@@ -88,8 +88,9 @@ async function startServer() {
       logger.error("Failed to start server:", error.message || error);
       process.exit(1);
     });
-  } catch (error: any) {
-    logger.error("Failed to start server:", error.message || error);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : error;
+    logger.error("Failed to start server:", message);
     process.exit(1);
   }
 }
