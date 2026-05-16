@@ -258,6 +258,31 @@ function inferConcernNameFromText(text: string): SkinConcern["name"] {
     return "Post-inflammatory erythema (PIE)";
   }
 
+  if (
+    containsAnyTerm(normalized, [
+      "brightness",
+      "brightening",
+      "dull",
+      "dullness",
+      "glow",
+      "radiance",
+      "tone appears even",
+    ]) &&
+    !containsAnyTerm(normalized, [
+      "texture",
+      "clogged",
+      "pore",
+      "pigmentation",
+      "mark",
+      "redness",
+      "dry",
+      "flak",
+      "irritation",
+    ])
+  ) {
+    return "Barrier impairment";
+  }
+
   if (containsAnyTerm(normalized, ["redness", "irritation", "inflamed", "reactive"])) {
     return "Redness / irritation";
   }
@@ -282,7 +307,22 @@ function inferConcernNameFromText(text: string): SkinConcern["name"] {
     return "Fine lines";
   }
 
-  return "Barrier impairment";
+  if (
+    containsAnyTerm(normalized, [
+      "barrier",
+      "flak",
+      "tight",
+      "dry patch",
+      "compromised",
+      "irritation",
+      "stinging",
+      "sensitized",
+    ])
+  ) {
+    return "Barrier impairment";
+  }
+
+  return "Texture / clogged pores";
 }
 
 function normalizeConcernName(value: unknown, evidence?: unknown): SkinConcern["name"] {
@@ -355,6 +395,51 @@ function isWeakProductName(name: string): boolean {
   const normalized = name.trim().toLowerCase();
   if (normalized.length < 6) return true;
   return GENERIC_PRODUCT_NAME_TERMS.some((term) => normalized === term);
+}
+
+function isMaintenanceConcern(concern: SkinConcern): boolean {
+  const evidence = (concern.evidence ?? "").toLowerCase();
+  return (
+    concern.severity === "Mild" &&
+    !containsAnyTerm(evidence, [
+      "inflamed",
+      "cyst",
+      "papule",
+      "pustule",
+      "breakout",
+      "scarring",
+      "raw",
+      "crust",
+    ])
+  );
+}
+
+function isWeakCosmeticOnlyEvidence(evidence: string): boolean {
+  const normalized = evidence.toLowerCase();
+  return (
+    containsAnyTerm(normalized, [
+      "brightness",
+      "brightening",
+      "dull",
+      "dullness",
+      "glow",
+      "radiance",
+      "could benefit",
+    ]) &&
+    !containsAnyTerm(normalized, [
+      "texture",
+      "clogged",
+      "pore",
+      "pigment",
+      "mark",
+      "redness",
+      "dry",
+      "flak",
+      "irritation",
+      "inflamed",
+      "breakout",
+    ])
+  );
 }
 
 interface ImageUsabilityAssessment {
@@ -777,7 +862,10 @@ Rules:
         severity: normalizeSeverity(concern?.severity),
         confidence: normalizeConfidenceValue(concern?.confidence, 0.5),
         evidence: asNonEmptyString(concern?.evidence) || undefined,
-      })),
+      })).filter((concern) => {
+        const evidence = concern.evidence ?? "";
+        return !isWeakCosmeticOnlyEvidence(evidence);
+      }),
       ingredients: (Array.isArray(json.ingredients) ? json.ingredients : []).map(
         (ingredient) => ({
           ingredient: asNonEmptyString(
@@ -957,6 +1045,109 @@ Rules:
     next.disclaimers.push(
       "More-active mode increased treatment cadence where the visible findings supported it."
     );
+
+    return next;
+  }
+
+  private lightenLowConcernResults(
+    json: SkinAnalysisResponse,
+    prefs: {
+      routineIntensity: RoutineIntensity;
+      sensitiveMode: boolean;
+    }
+  ): SkinAnalysisResponse {
+    if (json.escalation.level !== "none") {
+      return json;
+    }
+
+    const concerns = json.concerns ?? [];
+    const lowConcernProfile =
+      (json.skinType.type === "Normal" || json.skinType.confidence >= 0.65) &&
+      concerns.length <= 1 &&
+      concerns.every(isMaintenanceConcern);
+
+    if (!lowConcernProfile) {
+      return json;
+    }
+
+    const next: SkinAnalysisResponse = {
+      ...json,
+      concerns: concerns.filter((concern) => {
+        const evidence = (concern.evidence ?? "").toLowerCase();
+        if (concern.name !== "Barrier impairment") {
+          return true;
+        }
+
+        return containsAnyTerm(evidence, [
+          "barrier",
+          "flak",
+          "tight",
+          "dry patch",
+          "stinging",
+          "irritation",
+          "sensitized",
+        ]);
+      }),
+      products: [...json.products],
+      ingredients: [...json.ingredients],
+      routine: {
+        AM: [...json.routine.AM],
+        PM: [...json.routine.PM],
+        weekly: [...(json.routine.weekly ?? [])],
+      },
+      explanation: {
+        ...json.explanation,
+        skinTypeExplanation:
+          "The visible skin surface appears largely balanced and clear, so the routine should stay maintenance-focused rather than treatment-heavy.",
+        productBenefits: [
+          "The routine focuses on maintaining hydration, barrier stability, and daily UV protection without adding unnecessary actives.",
+          "A lighter maintenance plan reduces the chance of creating irritation on skin that already appears relatively stable.",
+        ],
+      },
+      disclaimers: [
+        ...json.disclaimers,
+        "Low-concern maintenance mode was applied because the visible findings appeared minimal.",
+      ],
+    };
+
+    if (next.concerns.length === 0) {
+      next.ingredients = next.ingredients.filter((ingredient) => {
+        const text = stringifyForComplianceCheck(ingredient).toLowerCase();
+        return !containsAnyTerm(text, TREATMENT_ACTIVE_TERMS);
+      });
+
+      next.products = next.products.filter((product) => {
+        const text = stringifyForComplianceCheck(product).toLowerCase();
+        if (product.category === "Cleanser" || product.category === "Moisturizer" || product.category === "Sunscreen") {
+          return true;
+        }
+
+        return !containsAnyTerm(text, TREATMENT_ACTIVE_TERMS);
+      });
+
+      next.routine.AM = next.routine.AM.filter(
+        (step) => !containsAnyTerm(step.toLowerCase(), TREATMENT_ACTIVE_TERMS)
+      );
+      next.routine.PM = next.routine.PM.filter(
+        (step) => !containsAnyTerm(step.toLowerCase(), TREATMENT_ACTIVE_TERMS)
+      );
+    }
+
+    const desiredActiveCycle =
+      prefs.routineIntensity === "minimal" || prefs.sensitiveMode
+        ? "Active cycle (Mon–Sun): Mon Barrier night | Tue Barrier night | Wed Barrier night | Thu Barrier night | Fri Barrier night | Sat Barrier night | Sun Barrier night"
+        : "Active cycle (Mon–Sun): Mon Maintenance night | Tue Barrier night | Wed Maintenance night | Thu Barrier night | Fri Maintenance night | Sat Barrier night | Sun Barrier night";
+    const desiredRamp =
+      prefs.routineIntensity === "minimal" || prefs.sensitiveMode
+        ? "Ramp-up (4 weeks): Weeks 1–2 keep the routine simple and consistent; Weeks 3–4 add only one optional brightening step if skin remains calm; Maintenance keep the fewest effective steps"
+        : "Ramp-up (4 weeks): Weeks 1–2 keep the base routine consistent; Weeks 3–4 add only one optional brightening step if desired; Maintenance stay with a low-irritation maintenance rhythm";
+    const desiredRules =
+      "Rules: if the skin stays clear and comfortable, prioritize consistency over adding stronger treatment products.";
+
+    const currentWeekly = next.routine.weekly ?? [];
+    next.routine.weekly = currentWeekly
+      .filter((step) => !step.startsWith("Active cycle (Mon–Sun):") && !step.startsWith("Ramp-up (4 weeks):") && !step.startsWith("Rules:"))
+      .concat([desiredActiveCycle, desiredRamp, desiredRules]);
 
     return next;
   }
@@ -1541,6 +1732,7 @@ FINAL CHECK BEFORE YOU ANSWER:
       logger.info("Validation success: response matches schema.");
 
       json = this.applyEscalationGuardrails(json);
+      json = this.lightenLowConcernResults(json, userPreferences);
       json = this.strengthenForRoutineIntensity(json, userPreferences);
 
       const qualityWarnings = this.getQualityWarnings(json, userPreferences);

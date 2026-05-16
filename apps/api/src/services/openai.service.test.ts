@@ -265,3 +265,111 @@ describe("openAIService medical-review cleanup", () => {
     expect(cleaned.products.length).toBeLessThanOrEqual(1);
   });
 });
+
+describe("openAIService low-concern maintenance mode", () => {
+  it("removes weak barrier concerns and lightens cadence for clear-skin results", () => {
+    const lightened = (openAIService as unknown as {
+      lightenLowConcernResults: (
+        json: SkinAnalysisResponse,
+        prefs: {
+          routineIntensity: "minimal" | "balanced" | "more_active";
+          sensitiveMode: boolean;
+        }
+      ) => SkinAnalysisResponse;
+    }).lightenLowConcernResults(
+      createAnalysis({
+        skinType: {
+          type: "Normal",
+          confidence: 0.7,
+        },
+        concerns: [
+          {
+            name: "Barrier impairment",
+            severity: "Mild",
+            confidence: 0.6,
+            evidence: "The skin appears somewhat dull, indicating a potential need for brightening.",
+          },
+        ],
+        ingredients: [
+          {
+            ingredient: "Niacinamide",
+            reason: "Brightening support",
+            cautions: [],
+          },
+        ],
+        products: [
+          {
+            name: "Brightening Serum",
+            brand: "Some By Mi",
+            category: "Serum",
+            why: "Brightening support",
+            howToUse: "Use daily",
+            cautions: [],
+            tags: [],
+          },
+          {
+            name: "Hydrating Moisturizer",
+            brand: "Innisfree",
+            category: "Moisturizer",
+            why: "Hydration",
+            howToUse: "Use daily",
+            cautions: [],
+            tags: [],
+          },
+        ],
+        routine: {
+          AM: ["Gentle Foaming Cleanser", "Brightening Serum", "Hydrating Moisturizer", "Sunscreen SPF 50"],
+          PM: ["Gentle Foaming Cleanser", "Brightening Serum", "Hydrating Moisturizer"],
+          weekly: [
+            "Daily base (AM): Gentle Foaming Cleanser → Brightening Serum → Hydrating Moisturizer → Sunscreen SPF 50",
+            "Daily base (PM): Gentle Foaming Cleanser → Brightening Serum → Hydrating Moisturizer",
+            "Active cycle (Mon–Sun): Mon Treatment night | Tue Barrier night | Wed Treatment night | Thu Barrier night | Fri Treatment night | Sat Barrier night | Sun Barrier night",
+            "Ramp-up (4 weeks): Weeks 1–2 1 Treatment night; Weeks 3–4 3 Treatment nights; Maintenance 2 Treatment nights per week",
+            "Rules: Maintain consistency and adjust based on skin response.",
+          ],
+        },
+      }),
+      {
+        routineIntensity: "balanced",
+        sensitiveMode: false,
+      }
+    );
+
+    expect(lightened.concerns).toEqual([]);
+    expect(
+      (lightened.routine.weekly ?? []).some((step) =>
+        step.includes("Maintenance night")
+      )
+    ).toBe(true);
+    expect(
+      lightened.disclaimers.some((item) =>
+        item.includes("Low-concern maintenance mode")
+      )
+    ).toBe(true);
+  });
+});
+
+describe("openAIService weak cosmetic evidence filtering", () => {
+  it("drops concerns that are only inferred from vague brightness language", () => {
+    const normalized = (openAIService as unknown as {
+      normalizeAnalysisResponse: (json: SkinAnalysisResponse) => SkinAnalysisResponse;
+    }).normalizeAnalysisResponse(
+      createAnalysis({
+        skinType: {
+          type: "Normal",
+          confidence: 0.7,
+        },
+        concerns: [
+          {
+            name: "Texture / clogged pores",
+            severity: "Mild",
+            confidence: 0.6,
+            evidence: "The skin tone appears even but could benefit from enhanced brightness.",
+          },
+        ],
+      })
+    );
+
+    expect(normalized.concerns).toEqual([]);
+  });
+});
