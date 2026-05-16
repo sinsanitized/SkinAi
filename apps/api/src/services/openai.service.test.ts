@@ -429,6 +429,142 @@ describe("openAIService maintenance-mode quality warnings", () => {
   });
 });
 
+describe("openAIService aging-support routing", () => {
+  it("switches wrinkle-focused cases to a hydration and repair cadence", () => {
+    const adjusted = (openAIService as unknown as {
+      alignRoutineToConcernFamily: (
+        json: SkinAnalysisResponse,
+        prefs: {
+          routineIntensity: "minimal" | "balanced" | "more_active";
+          pregnancySafe: boolean;
+          sensitiveMode: boolean;
+        }
+      ) => SkinAnalysisResponse;
+    }).alignRoutineToConcernFamily(
+      createAnalysis({
+        skinType: {
+          type: "Dry",
+          confidence: 0.7,
+        },
+        concerns: [
+          {
+            name: "Fine lines",
+            severity: "Moderate",
+            confidence: 0.6,
+            evidence: "Visible fine lines around the eyes and mouth.",
+          },
+          {
+            name: "Dehydration",
+            severity: "Moderate",
+            confidence: 0.6,
+            evidence: "Skin appears rough and lacks moisture.",
+          },
+        ],
+        ingredients: [
+          {
+            ingredient: "Hyaluronic Acid",
+            reason: "Provides hydration.",
+            cautions: [],
+          },
+        ],
+        routine: {
+          AM: ["Cleanser", "Serum", "Moisturizer", "Sunscreen"],
+          PM: ["Cleanser", "Serum", "Moisturizer"],
+          weekly: [
+            "Daily base (AM): Cleanser, Serum, Moisturizer, Sunscreen",
+            "Daily base (PM): Cleanser, Serum, Moisturizer",
+            "Active cycle (Mon–Sun): Mon Treatment night | Tue Barrier night | Wed Treatment night | Thu Barrier night | Fri Treatment night | Sat Barrier night | Sun Barrier night",
+            "Ramp-up (4 weeks): Weeks 1–2 1-2 treatment nights; Weeks 3–4 3 treatment nights; Maintenance 2 treatment nights",
+            "Rules: Focus on hydration and anti-aging.",
+          ],
+        },
+      }),
+      {
+        routineIntensity: "balanced",
+        pregnancySafe: false,
+        sensitiveMode: false,
+      }
+    );
+
+    expect(
+      adjusted.ingredients.some((ingredient) =>
+        ingredient.ingredient.toLowerCase().includes("peptide")
+      )
+    ).toBe(true);
+    expect(
+      adjusted.routine.PM.some((step) => step.toLowerCase().includes("wrinkle-support"))
+    ).toBe(true);
+    expect(
+      (adjusted.routine.weekly ?? []).some((step) => step.includes("Repair night"))
+    ).toBe(true);
+    expect(
+      (adjusted.routine.weekly ?? []).some((step) => step.includes("Hydration night"))
+    ).toBe(true);
+    expect(
+      adjusted.disclaimers.some((item) => item.includes("Aging-support mode"))
+    ).toBe(true);
+  });
+
+  it("does not flag wrinkle-care plans as too thin when aging-support mode is active", () => {
+    const warnings = (openAIService as unknown as {
+      getQualityWarnings: (
+        json: SkinAnalysisResponse,
+        prefs: {
+          routineIntensity: "minimal" | "balanced" | "more_active";
+          sensitiveMode: boolean;
+        }
+      ) => string[];
+    }).getQualityWarnings(
+      createAnalysis({
+        skinType: {
+          type: "Dry",
+          confidence: 0.75,
+        },
+        concerns: [
+          {
+            name: "Fine lines",
+            severity: "Moderate",
+            confidence: 0.8,
+            evidence: "Visible wrinkles around the eyes and mouth.",
+          },
+          {
+            name: "Dehydration",
+            severity: "Moderate",
+            confidence: 0.7,
+            evidence: "Skin appears rough and lacks moisture.",
+          },
+        ],
+        routine: {
+          AM: ["Cleanser", "Serum", "Moisturizer", "Sunscreen"],
+          PM: [
+            "Cleanser",
+            "Treatment serum - 2x-week to start - use a wrinkle-supportive serum on non-consecutive nights",
+            "Moisturizer",
+          ],
+          weekly: [
+            "Daily base (AM): Cleanser, Serum, Moisturizer, Sunscreen",
+            "Daily base (PM): Cleanser, Treatment serum - 2x-week to start - use a wrinkle-supportive serum on non-consecutive nights, Moisturizer",
+            "Active cycle (Mon–Sun): Mon Repair night | Tue Hydration night | Wed Repair night | Thu Hydration night | Fri Repair night | Sat Hydration night | Sun Recovery night",
+            "Ramp-up (4 weeks): Weeks 1–2 use the wrinkle-support step once or twice weekly; Weeks 3–4 increase to two or three nights weekly if comfortable; Maintenance keep the strongest cadence the skin tolerates without dryness",
+            "Rules: if dryness, stinging, or tightness increases, reduce wrinkle-focused nights and lean more heavily on hydration and moisturizer.",
+          ],
+        },
+        disclaimers: [
+          "Aging-support mode was applied because fine lines and dryness were more prominent than acne-style concerns.",
+        ],
+      }),
+      {
+        routineIntensity: "balanced",
+        sensitiveMode: false,
+      }
+    );
+
+    expect(
+      warnings.some((warning) => warning.includes("Routine may be too thin"))
+    ).toBe(false);
+  });
+});
+
 describe("openAIService weak cosmetic evidence filtering", () => {
   it("drops concerns that are only inferred from vague brightness language", () => {
     const normalized = (openAIService as unknown as {

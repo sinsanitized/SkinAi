@@ -448,8 +448,18 @@ function isMaintenanceMode(json: SkinAnalysisResponse): boolean {
   );
 }
 
+function isAgingSupportMode(json: SkinAnalysisResponse): boolean {
+  return json.disclaimers.some((item) =>
+    item.includes("Aging-support mode was applied")
+  );
+}
+
 function formatWeeklyBase(prefix: "Daily base (AM)" | "Daily base (PM)", steps: string[]): string {
   return `${prefix}: ${steps.join(", ")}`;
+}
+
+function routineHasTerm(steps: string[], terms: readonly string[]): boolean {
+  return steps.some((step) => containsAnyTerm(step.toLowerCase(), terms));
 }
 
 interface ImageUsabilityAssessment {
@@ -1059,6 +1069,124 @@ Rules:
     return next;
   }
 
+  private alignRoutineToConcernFamily(
+    json: SkinAnalysisResponse,
+    prefs: {
+      routineIntensity: RoutineIntensity;
+      pregnancySafe: boolean;
+      sensitiveMode: boolean;
+    }
+  ): SkinAnalysisResponse {
+    if (json.escalation.level !== "none") {
+      return json;
+    }
+
+    const concerns = json.concerns ?? [];
+    const hasAgingConcerns = hasConcern(concerns, ["Fine lines", "Dehydration"]);
+    const hasAcneConcerns = hasConcern(concerns, [
+      "Inflammatory acne",
+      "Comedonal acne",
+      "Texture / clogged pores",
+      "Excess oil / sebum",
+    ]);
+
+    if (!hasAgingConcerns || hasAcneConcerns) {
+      return json;
+    }
+
+    const next: SkinAnalysisResponse = {
+      ...json,
+      ingredients: [...json.ingredients],
+      products: [...json.products],
+      routine: {
+        AM: [...json.routine.AM],
+        PM: [...json.routine.PM],
+        weekly: [...(json.routine.weekly ?? [])],
+      },
+      explanation: {
+        ...json.explanation,
+        skinTypeExplanation:
+          "The visible skin shows dryness and fine-line changes, so the routine should emphasize hydration, barrier support, and gradual texture-focused aging care rather than acne-style cycling.",
+        productBenefits: [
+          "The routine prioritizes moisture retention and barrier support so the skin stays more comfortable and less crepey over time.",
+          "A gradual wrinkle-support step can improve texture and fine-line appearance without forcing an overly aggressive schedule.",
+        ],
+        layeringGuide: [
+          "Cleanser comes first, followed by any treatment serum, then moisturizer to seal in hydration.",
+          "Use richer hydration at night when the skin looks dry or lined.",
+          "Keep sunscreen as the final morning step every day to protect against further photoaging.",
+        ],
+      },
+      disclaimers: [
+        ...json.disclaimers,
+        "Aging-support mode was applied because fine lines and dryness were more prominent than acne-style concerns.",
+      ],
+    };
+
+    const ingredientText = stringifyForComplianceCheck(next.ingredients).toLowerCase();
+    if (!containsAnyTerm(ingredientText, ["peptide"])) {
+      next.ingredients.push({
+        ingredient: "Peptides",
+        reason: "Support skin elasticity and complement a gradual wrinkle-focused routine.",
+        cautions: [],
+      });
+    }
+
+    if (!prefs.pregnancySafe && !containsAnyTerm(ingredientText, ["retinal", "retinol", "retinoid"])) {
+      next.ingredients.push({
+        ingredient: "Retinal",
+        reason: "A gradual retinoid-style step can support fine lines and texture when the skin is tolerating a balanced routine.",
+        cautions: [
+          "Start on non-consecutive nights and reduce frequency if dryness or irritation develops.",
+        ],
+      });
+    }
+
+    if (!routineHasTerm(next.routine.PM, ["retinal", "retinol", "retinoid", "peptide"])) {
+      next.routine.PM = [
+        "Cleanser",
+        "Treatment serum - 2x-week to start - use a wrinkle-supportive serum on non-consecutive nights",
+        "Moisturizer",
+      ];
+    }
+
+    if (!routineHasTerm(next.routine.AM, ["sunscreen"])) {
+      next.routine.AM = ["Cleanser", "Moisturizer", "Sunscreen"];
+    } else if (!routineHasTerm(next.routine.AM, ["moisturizer"])) {
+      next.routine.AM = ["Cleanser", "Moisturizer", "Sunscreen"];
+    }
+
+    const activeCycle =
+      prefs.sensitiveMode || prefs.routineIntensity === "minimal"
+        ? "Active cycle (Mon–Sun): Mon Repair night | Tue Hydration night | Wed Repair night | Thu Hydration night | Fri Repair night | Sat Hydration night | Sun Hydration night"
+        : "Active cycle (Mon–Sun): Mon Repair night | Tue Hydration night | Wed Repair night | Thu Hydration night | Fri Repair night | Sat Hydration night | Sun Recovery night";
+    const rampUp =
+      prefs.sensitiveMode || prefs.routineIntensity === "minimal"
+        ? "Ramp-up (4 weeks): Weeks 1–2 use the wrinkle-support step once weekly; Weeks 3–4 increase to twice weekly if the skin stays comfortable; Maintenance hold at the lowest effective frequency"
+        : "Ramp-up (4 weeks): Weeks 1–2 use the wrinkle-support step once or twice weekly; Weeks 3–4 increase to two or three nights weekly if comfortable; Maintenance keep the strongest cadence the skin tolerates without dryness";
+    const rules =
+      "Rules: if dryness, stinging, or tightness increases, reduce wrinkle-focused nights and lean more heavily on hydration and moisturizer.";
+
+    next.routine.weekly = (next.routine.weekly ?? [])
+      .filter(
+        (step) =>
+          !step.startsWith("Daily base (AM):") &&
+          !step.startsWith("Daily base (PM):") &&
+          !step.startsWith("Active cycle (Mon–Sun):") &&
+          !step.startsWith("Ramp-up (4 weeks):") &&
+          !step.startsWith("Rules:")
+      )
+      .concat([
+        formatWeeklyBase("Daily base (AM)", next.routine.AM),
+        formatWeeklyBase("Daily base (PM)", next.routine.PM),
+        activeCycle,
+        rampUp,
+        rules,
+      ]);
+
+    return next;
+  }
+
   private lightenLowConcernResults(
     json: SkinAnalysisResponse,
     prefs: {
@@ -1518,8 +1646,14 @@ FINAL CHECK BEFORE YOU ANSWER:
     const { minAm, minPm } = getRoutineLengthTargets(prefs);
     const isMedicalReview = json.escalation?.level === "medical_review";
     const maintenanceMode = isMaintenanceMode(json);
+    const agingSupportMode = isAgingSupportMode(json);
 
-    if (!isMedicalReview && !maintenanceMode && (amLen < minAm || pmLen < minPm)) {
+    if (
+      !isMedicalReview &&
+      !maintenanceMode &&
+      !agingSupportMode &&
+      (amLen < minAm || pmLen < minPm)
+    ) {
       warnings.push(
         `Routine may be too thin for the selected intensity (AM=${amLen}, PM=${pmLen}).`
       );
@@ -1770,6 +1904,7 @@ FINAL CHECK BEFORE YOU ANSWER:
 
       json = this.applyEscalationGuardrails(json);
       json = this.lightenLowConcernResults(json, userPreferences);
+      json = this.alignRoutineToConcernFamily(json, userPreferences);
       json = this.strengthenForRoutineIntensity(json, userPreferences);
 
       const qualityWarnings = this.getQualityWarnings(json, userPreferences);
