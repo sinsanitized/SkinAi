@@ -351,6 +351,61 @@ describe("openAIService low-concern maintenance mode", () => {
       )
     ).toBe(true);
   });
+
+  it("removes stale conflicts when maintenance mode strips the related actives", () => {
+    const lightened = (openAIService as unknown as {
+      lightenLowConcernResults: (
+        json: SkinAnalysisResponse,
+        prefs: {
+          routineIntensity: "minimal" | "balanced" | "more_active";
+          sensitiveMode: boolean;
+        }
+      ) => SkinAnalysisResponse;
+    }).lightenLowConcernResults(
+      createAnalysis({
+        skinType: {
+          type: "Normal",
+          confidence: 0.75,
+        },
+        concerns: [],
+        ingredients: [
+          {
+            ingredient: "Niacinamide",
+            reason: "Tone support",
+            cautions: [],
+          },
+        ],
+        products: [
+          {
+            name: "Brightening Serum",
+            brand: "The Ordinary",
+            category: "Serum",
+            why: "Tone support",
+            howToUse: "Use nightly",
+            cautions: [],
+            tags: [],
+          },
+        ],
+        routine: {
+          AM: ["Cleanser", "Sunscreen"],
+          PM: ["Cleanser", "Brightening Serum"],
+          weekly: ["Rules: patch test"],
+        },
+        conflicts: [
+          {
+            ingredients: ["Niacinamide", "Vitamin C"],
+            warning: "Avoid combining them.",
+          },
+        ],
+      }),
+      {
+        routineIntensity: "balanced",
+        sensitiveMode: false,
+      }
+    );
+
+    expect(lightened.conflicts).toEqual([]);
+  });
 });
 
 describe("openAIService maintenance-mode quality warnings", () => {
@@ -587,5 +642,435 @@ describe("openAIService weak cosmetic evidence filtering", () => {
     );
 
     expect(normalized.concerns).toEqual([]);
+  });
+
+  it("drops clogged-pore concerns that are only justified by freckles", () => {
+    const normalized = (openAIService as unknown as {
+      normalizeAnalysisResponse: (json: SkinAnalysisResponse) => SkinAnalysisResponse;
+    }).normalizeAnalysisResponse(
+      createAnalysis({
+        skinType: {
+          type: "Normal",
+          confidence: 0.8,
+        },
+        concerns: [
+          {
+            name: "Texture / clogged pores",
+            severity: "Mild",
+            confidence: 0.9,
+            evidence: "Visible freckles across the cheeks and nose.",
+          },
+        ],
+      })
+    );
+
+    expect(normalized.concerns).toEqual([]);
+  });
+
+  it("drops pigmentation concerns that are only justified by freckles", () => {
+    const normalized = (openAIService as unknown as {
+      normalizeAnalysisResponse: (json: SkinAnalysisResponse) => SkinAnalysisResponse;
+    }).normalizeAnalysisResponse(
+      createAnalysis({
+        skinType: {
+          type: "Normal",
+          confidence: 0.8,
+        },
+        concerns: [
+          {
+            name: "Post-inflammatory hyperpigmentation (PIH)",
+            severity: "Mild",
+            confidence: 0.7,
+            evidence: "Visible freckles across the cheeks and nose.",
+          },
+        ],
+      })
+    );
+
+    expect(normalized.concerns).toEqual([]);
+  });
+
+  it("drops birthmark-only concerns instead of turning them into PIH or texture issues", () => {
+    const normalized = (openAIService as unknown as {
+      normalizeAnalysisResponse: (json: SkinAnalysisResponse) => SkinAnalysisResponse;
+    }).normalizeAnalysisResponse(
+      createAnalysis({
+        skinType: {
+          type: "Normal",
+          confidence: 0.7,
+        },
+        concerns: [
+          {
+            name: "Texture / clogged pores",
+            severity: "Mild",
+            confidence: 0.6,
+            evidence:
+              "There are areas of discoloration on the forehead and temples consistent with a facial birthmark.",
+          },
+          {
+            name: "Post-inflammatory hyperpigmentation (PIH)",
+            severity: "Mild",
+            confidence: 0.6,
+            evidence:
+              "Visible port-wine stain style birthmark across the forehead.",
+          },
+        ],
+      })
+    );
+
+    expect(normalized.concerns).toEqual([]);
+  });
+
+  it("drops pigment-only discoloration concerns when there is no real pore or texture evidence", () => {
+    const normalized = (openAIService as unknown as {
+      normalizeAnalysisResponse: (json: SkinAnalysisResponse) => SkinAnalysisResponse;
+    }).normalizeAnalysisResponse(
+      createAnalysis({
+        concerns: [
+          {
+            name: "Texture / clogged pores",
+            severity: "Mild",
+            confidence: 0.6,
+            evidence:
+              "There are areas of discoloration on the forehead that appear slightly darker than the surrounding skin.",
+          },
+        ],
+      })
+    );
+
+    expect(normalized.concerns).toEqual([]);
+  });
+
+  it("drops texture concerns that are only supported by vague skin markings or age-related wording", () => {
+    const normalized = (openAIService as unknown as {
+      normalizeAnalysisResponse: (json: SkinAnalysisResponse) => SkinAnalysisResponse;
+    }).normalizeAnalysisResponse(
+      createAnalysis({
+        concerns: [
+          {
+            name: "Texture / clogged pores",
+            severity: "Mild",
+            confidence: 0.6,
+            evidence:
+              "There are some visible skin markings on the forehead, which may indicate age-related changes.",
+          },
+        ],
+      })
+    );
+
+    expect(normalized.concerns).toEqual([]);
+  });
+});
+
+describe("openAIService focal-lesion routing", () => {
+  it("routes lesion-like findings away from acne-style routines", () => {
+    const routed = (openAIService as unknown as {
+      routeFocalLesionResults: (json: SkinAnalysisResponse) => SkinAnalysisResponse;
+    }).routeFocalLesionResults(
+      createAnalysis({
+        skinType: {
+          type: "Combination / Acne-prone",
+          confidence: 0.7,
+        },
+        explanation: {
+          skinTypeExplanation:
+            "Visible bumps and uneven texture around the chin area.",
+          productBenefits: ["Targets texture"],
+          layeringGuide: ["Cleanser", "Treatment", "Moisturizer"],
+        },
+        concerns: [
+          {
+            name: "Texture / clogged pores",
+            severity: "Moderate",
+            confidence: 0.6,
+            evidence: "Visible bumps and uneven texture around the chin area.",
+          },
+          {
+            name: "Dehydration",
+            severity: "Mild",
+            confidence: 0.5,
+            evidence: "Lips appear dry and skin shows some flakiness.",
+          },
+        ],
+        ingredients: [
+          {
+            ingredient: "Salicylic Acid",
+            reason: "Helps clear bumps.",
+            cautions: [],
+          },
+        ],
+        products: [
+          {
+            name: "BHA Blackhead Power Liquid",
+            brand: "COSRX",
+            category: "Serum",
+            why: "Targets texture",
+            howToUse: "Use at night",
+            cautions: [],
+            tags: [],
+          },
+          {
+            name: "Moisturizing Cream",
+            brand: "Etude House",
+            category: "Moisturizer",
+            why: "Hydration",
+            howToUse: "Use daily",
+            cautions: [],
+            tags: [],
+          },
+          {
+            name: "Daily Sunscreen SPF 50",
+            brand: "Missha",
+            category: "Sunscreen",
+            why: "UV protection",
+            howToUse: "Use daily",
+            cautions: [],
+            tags: [],
+          },
+        ],
+        routine: {
+          AM: ["Cleanser", "Moisturizer", "Sunscreen"],
+          PM: ["Cleanser", "Treatment", "Moisturizer"],
+          weekly: [
+            "Daily base (AM): Cleanser, Moisturizer, Sunscreen",
+            "Daily base (PM): Cleanser, Treatment, Moisturizer",
+            "Active cycle (Mon–Sun): Mon Treatment night | Tue Barrier night | Wed Treatment night | Thu Barrier night | Fri Treatment night | Sat Barrier night | Sun Barrier night",
+            "Ramp-up (4 weeks): Weeks 1–2 1 Treatment night; Weeks 3–4 2 Treatment nights; Maintenance 3 Treatment nights",
+            "Rules: Adjust treatment frequency based on skin tolerance.",
+          ],
+        },
+      })
+    );
+
+    expect(routed.escalation.level).toBe("monitor");
+    expect(routed.routine.PM).toEqual(["Cleanser", "Moisturizer"]);
+    expect(
+      routed.disclaimers.some((item) => item.includes("Focal-lesion mode"))
+    ).toBe(true);
+    expect(routed.concerns).toEqual([]);
+  });
+
+  it("can still reroute a localized raised bump even if the model labels it inflammatory acne", () => {
+    const routed = (openAIService as unknown as {
+      routeFocalLesionResults: (json: SkinAnalysisResponse) => SkinAnalysisResponse;
+    }).routeFocalLesionResults(
+      createAnalysis({
+        concerns: [
+          {
+            name: "Inflammatory acne",
+            severity: "Moderate",
+            confidence: 0.6,
+            evidence: "Visible bumps and some redness around the chin area.",
+          },
+        ],
+      })
+    );
+
+    expect(routed.escalation.level).toBe("monitor");
+    expect(routed.concerns).toEqual([]);
+    expect(routed.routine.PM).toEqual(["Cleanser", "Moisturizer"]);
+  });
+
+  it("does not add thin-routine warnings in focal-lesion mode", () => {
+    const warnings = (openAIService as unknown as {
+      getQualityWarnings: (
+        json: SkinAnalysisResponse,
+        prefs: {
+          routineIntensity: "minimal" | "balanced" | "more_active";
+          sensitiveMode: boolean;
+        }
+      ) => string[];
+    }).getQualityWarnings(
+      createAnalysis({
+        skinType: {
+          type: "Sensitive-leaning",
+          confidence: 0.35,
+        },
+        concerns: [],
+        routine: {
+          AM: ["Cleanser", "Moisturizer", "Sunscreen"],
+          PM: ["Cleanser", "Moisturizer"],
+          weekly: [
+            "Daily base (AM): Cleanser, Moisturizer, Sunscreen",
+            "Daily base (PM): Cleanser, Moisturizer",
+            "Active cycle (Mon–Sun): Mon Barrier night | Tue Barrier night | Wed Barrier night | Thu Barrier night | Fri Barrier night | Sat Barrier night | Sun Barrier night",
+            "Ramp-up (4 weeks): Weeks 1–2 keep the routine gentle; Weeks 3–4 continue basic care; Maintenance prioritize observation",
+            "Rules: if the spot changes or bleeds, arrange a clinical skin check",
+          ],
+        },
+        products: [
+          {
+            name: "Gentle Cleanser",
+            brand: "COSRX",
+            category: "Cleanser",
+            why: "Gentle cleansing",
+            howToUse: "Use daily",
+            cautions: [],
+            tags: [],
+          },
+          {
+            name: "Moisturizing Cream",
+            brand: "Etude House",
+            category: "Moisturizer",
+            why: "Hydration",
+            howToUse: "Use daily",
+            cautions: [],
+            tags: [],
+          },
+          {
+            name: "Daily Sunscreen SPF 50",
+            brand: "Missha",
+            category: "Sunscreen",
+            why: "UV protection",
+            howToUse: "Use daily",
+            cautions: [],
+            tags: [],
+          },
+        ],
+        disclaimers: [
+          "Focal-lesion mode was applied because the visible finding looked more like a mole, wart, tag, cyst, or localized growth than ordinary acne-style texture.",
+        ],
+      }),
+      {
+        routineIntensity: "balanced",
+        sensitiveMode: false,
+      }
+    );
+
+    expect(
+      warnings.some((warning) => warning.includes("Routine may be too thin"))
+    ).toBe(false);
+    expect(
+      warnings.some((warning) => warning.includes("Product coverage is narrower"))
+    ).toBe(false);
+  });
+});
+
+describe("openAIService special-condition routing", () => {
+  it("routes melasma-like findings into pigment-pattern mode", () => {
+    const routed = (openAIService as unknown as {
+      routePigmentPatternResults: (json: SkinAnalysisResponse) => SkinAnalysisResponse;
+    }).routePigmentPatternResults(
+      createAnalysis({
+        concerns: [
+          {
+            name: "Post-inflammatory hyperpigmentation (PIH)",
+            severity: "Moderate",
+            confidence: 0.7,
+            evidence: "Symmetric melasma-style pigmentation is visible across the cheeks and forehead.",
+          },
+        ],
+      })
+    );
+
+    expect(routed.escalation.level).toBe("none");
+    expect(routed.concerns[0]?.name).toBe("Post-inflammatory hyperpigmentation (PIH)");
+    expect(
+      routed.disclaimers.some((item) => item.includes("Pigment-pattern mode"))
+    ).toBe(true);
+    expect(routed.routine.AM).toEqual([
+      "Cleanser",
+      "Pigment-support serum",
+      "Moisturizer",
+      "Sunscreen",
+    ]);
+  });
+
+  it("routes rosacea-like findings into a barrier-first monitor plan", () => {
+    const routed = (openAIService as unknown as {
+      routeBarrierConditionResults: (json: SkinAnalysisResponse) => SkinAnalysisResponse;
+    }).routeBarrierConditionResults(
+      createAnalysis({
+        concerns: [
+          {
+            name: "Redness / irritation",
+            severity: "Moderate",
+            confidence: 0.7,
+            evidence: "Persistent redness, flushing, and visible vessels suggest a rosacea-like pattern.",
+          },
+        ],
+      })
+    );
+
+    expect(routed.escalation.level).toBe("monitor");
+    expect(routed.skinType.type).toBe("Sensitive-leaning");
+    expect(
+      routed.disclaimers.some((item) => item.includes("Barrier-condition mode"))
+    ).toBe(true);
+    expect(routed.routine.weekly?.[2]).toContain("Barrier night");
+  });
+
+  it("routes suspicious rough patches into medical review", () => {
+    const routed = (openAIService as unknown as {
+      routeSuspiciousMedicalResults: (json: SkinAnalysisResponse) => SkinAnalysisResponse;
+    }).routeSuspiciousMedicalResults(
+      createAnalysis({
+        concerns: [
+          {
+            name: "Texture / clogged pores",
+            severity: "Moderate",
+            confidence: 0.6,
+            evidence: "A persistent rough actinic keratosis-like patch is visible on the cheek.",
+          },
+        ],
+      })
+    );
+
+    expect(routed.escalation.level).toBe("medical_review");
+    expect(
+      routed.disclaimers.some((item) => item.includes("Suspicious-patch mode"))
+    ).toBe(true);
+  });
+
+  it("routes vitiligo-like findings into hypopigment mode", () => {
+    const routed = (openAIService as unknown as {
+      routeHypopigmentResults: (json: SkinAnalysisResponse) => SkinAnalysisResponse;
+    }).routeHypopigmentResults(
+      createAnalysis({
+        concerns: [
+          {
+            name: "Barrier impairment",
+            severity: "Mild",
+            confidence: 0.5,
+            evidence: "Visible hypopigmented patches suggest a vitiligo-like pattern.",
+          },
+        ],
+      })
+    );
+
+    expect(routed.escalation.level).toBe("monitor");
+    expect(routed.concerns).toEqual([]);
+    expect(
+      routed.disclaimers.some((item) => item.includes("Hypopigment mode"))
+    ).toBe(true);
+  });
+
+  it("routes milia-like findings away from classic acne plans", () => {
+    const routed = (openAIService as unknown as {
+      routeFollicularVariantResults: (
+        json: SkinAnalysisResponse,
+        prefs: { pregnancySafe: boolean }
+      ) => SkinAnalysisResponse;
+    }).routeFollicularVariantResults(
+      createAnalysis({
+        concerns: [
+          {
+            name: "Texture / clogged pores",
+            severity: "Mild",
+            confidence: 0.55,
+            evidence: "Tiny white bumps around the eyes look more like milia than inflamed acne.",
+          },
+        ],
+      }),
+      {
+        pregnancySafe: false,
+      }
+    );
+
+    expect(routed.escalation.level).toBe("none");
+    expect(
+      routed.disclaimers.some((item) => item.includes("Follicular-variant mode"))
+    ).toBe(true);
+    expect(routed.routine.PM[1]).toContain("retinoid-style");
   });
 });

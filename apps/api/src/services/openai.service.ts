@@ -135,6 +135,141 @@ const GENERIC_PRODUCT_NAME_TERMS = [
   "spf",
   "spot treatment",
 ] as const;
+const BENIGN_PIGMENT_TERMS = [
+  "freckle",
+  "freckles",
+  "ephelides",
+  "beauty mark",
+  "pigmented spot",
+  "birthmark",
+  "port-wine stain",
+  "port wine stain",
+  "nevus flammeus",
+  "congenital nevus",
+  "congenital naevus",
+  "strawberry birthmark",
+  "capillary malformation",
+] as const;
+const FOCAL_LESION_TERMS = [
+  "mole",
+  "nevus",
+  "naevus",
+  "skin tag",
+  "acrochordon",
+  "wart",
+  "verruca",
+  "papilloma",
+  "cyst",
+  "sebaceous cyst",
+  "growth",
+  "raised lesion",
+  "lesion",
+  "papule",
+  "nodule",
+  "lump",
+  "seborrheic keratosis",
+  "keratosis",
+] as const;
+const LOCALIZED_LESION_LOCATION_TERMS = [
+  "chin",
+  "eyelid",
+  "ear",
+  "forehead",
+  "temple",
+  "lip",
+  "cheek",
+  "jaw",
+  "nose",
+] as const;
+const ROSACEA_TERMS = [
+  "rosacea",
+  "flushing",
+  "persistent redness",
+  "diffuse redness",
+  "visible vessels",
+  "telangiectasia",
+] as const;
+const MELASMA_TERMS = [
+  "melasma",
+  "patchy pigmentation",
+  "symmetric pigmentation",
+  "mask-like pigmentation",
+] as const;
+const LENTIGINE_TERMS = [
+  "solar lentigo",
+  "solar lentigines",
+  "lentigo",
+  "lentigines",
+  "sun spot",
+  "sun spots",
+] as const;
+const SEB_DERM_TERMS = [
+  "seborrheic dermatitis",
+  "seb derm",
+  "greasy flaking",
+  "greasy scale",
+  "brow scaling",
+  "nasolabial scaling",
+] as const;
+const PERIORAL_DERM_TERMS = [
+  "perioral dermatitis",
+  "around the mouth",
+  "mouth-area papules",
+  "mouth area papules",
+  "periorificial dermatitis",
+] as const;
+const ECZEMA_TERMS = [
+  "eczema",
+  "atopic dermatitis",
+  "dermatitis patch",
+  "itchy patch",
+  "inflamed dry patch",
+] as const;
+const PSORIASIS_TERMS = [
+  "psoriasis",
+  "plaque",
+  "thick scaling",
+  "silvery scale",
+] as const;
+const FOLLICULITIS_TERMS = [
+  "folliculitis",
+  "follicular bumps",
+  "razor bumps",
+  "ingrown hair",
+  "ingrown hairs",
+] as const;
+const MILIA_TERMS = [
+  "milia",
+  "tiny white bump",
+  "tiny white bumps",
+  "small white cyst",
+  "small white cysts",
+] as const;
+const HYPOPIGMENT_TERMS = [
+  "vitiligo",
+  "hypopigmentation",
+  "hypopigmented patch",
+  "loss of pigment",
+  "depigmented patch",
+] as const;
+const ACTINIC_TERMS = [
+  "actinic keratosis",
+  "rough precancerous patch",
+  "suspicious rough patch",
+  "persistent rough lesion",
+  "non-healing rough spot",
+] as const;
+const COLD_SORE_TERMS = [
+  "cold sore",
+  "herpes labialis",
+  "grouped lip vesicle",
+  "grouped lip blisters",
+] as const;
+const ANGULAR_CHEILITIS_TERMS = [
+  "angular cheilitis",
+  "corner of the mouth cracking",
+  "cracking at the corners of the mouth",
+] as const;
 
 function getRoutineLengthTargets(prefs: {
   routineIntensity: RoutineIntensity;
@@ -259,6 +394,28 @@ function inferConcernNameFromText(text: string): SkinConcern["name"] {
   }
 
   if (
+    containsPatternTerms(normalized, [
+      ROSACEA_TERMS,
+      SEB_DERM_TERMS,
+      PERIORAL_DERM_TERMS,
+      ECZEMA_TERMS,
+      PSORIASIS_TERMS,
+      COLD_SORE_TERMS,
+      ANGULAR_CHEILITIS_TERMS,
+    ])
+  ) {
+    return "Redness / irritation";
+  }
+
+  if (containsPatternTerms(normalized, [MELASMA_TERMS, LENTIGINE_TERMS])) {
+    return "Post-inflammatory hyperpigmentation (PIH)";
+  }
+
+  if (containsPatternTerms(normalized, [HYPOPIGMENT_TERMS])) {
+    return "Barrier impairment";
+  }
+
+  if (
     containsAnyTerm(normalized, [
       "brightness",
       "brightening",
@@ -293,6 +450,10 @@ function inferConcernNameFromText(text: string): SkinConcern["name"] {
 
   if (containsAnyTerm(normalized, ["oil", "sebum", "shine", "greasy"])) {
     return "Excess oil / sebum";
+  }
+
+  if (containsAnyTerm(normalized, BENIGN_PIGMENT_TERMS)) {
+    return "Post-inflammatory hyperpigmentation (PIH)";
   }
 
   if (containsAnyTerm(normalized, ["texture", "uneven", "clogged", "pore"])) {
@@ -417,15 +578,38 @@ function isMaintenanceConcern(concern: SkinConcern): boolean {
 function isWeakCosmeticOnlyEvidence(evidence: string): boolean {
   const normalized = evidence.toLowerCase();
   return (
-    containsAnyTerm(normalized, [
-      "brightness",
-      "brightening",
-      "dull",
-      "dullness",
-      "glow",
-      "radiance",
-      "could benefit",
-    ]) &&
+    (
+      containsAnyTerm(normalized, [
+        "brightness",
+        "brightening",
+        "dull",
+        "dullness",
+        "glow",
+        "radiance",
+        "could benefit",
+      ]) ||
+      (
+        containsAnyTerm(normalized, [
+          "discoloration",
+          "darker",
+          "darker than",
+          "uneven tone",
+          "uneven skin tone",
+          "slightly darker",
+        ]) &&
+        !containsAnyTerm(normalized, [
+          "post-inflammatory",
+          "post inflammatory",
+          "acne mark",
+          "breakout mark",
+          "red mark",
+          "brown mark",
+          "sun damage",
+          "melasma",
+          "pigmentation type",
+        ])
+      )
+    ) &&
     !containsAnyTerm(normalized, [
       "texture",
       "clogged",
@@ -442,6 +626,70 @@ function isWeakCosmeticOnlyEvidence(evidence: string): boolean {
   );
 }
 
+function isBenignPigmentEvidence(evidence: string): boolean {
+  return containsAnyTerm(evidence.toLowerCase(), BENIGN_PIGMENT_TERMS);
+}
+
+function hasFocalLesionLanguage(text: string): boolean {
+  return containsAnyTerm(text.toLowerCase(), FOCAL_LESION_TERMS);
+}
+
+function isLocalizedRaisedBumpEvidence(evidence: string): boolean {
+  const normalized = evidence.toLowerCase();
+  return (
+    containsAnyTerm(normalized, ["bump", "bumps", "raised", "papule", "nodule", "lump"]) &&
+    containsAnyTerm(normalized, LOCALIZED_LESION_LOCATION_TERMS) &&
+    !containsAnyTerm(normalized, [
+      "clogged",
+      "pore",
+      "pores",
+      "blackhead",
+      "whitehead",
+      "comed",
+      "breakout",
+      "acne",
+      "sebum",
+      "oil",
+      "t-zone",
+      "diffuse",
+      "widespread",
+    ])
+  );
+}
+
+function isWeakTextureOnlyEvidence(evidence: string): boolean {
+  const normalized = evidence.toLowerCase();
+  const hasRealTextureSignal = containsAnyTerm(normalized, [
+    "texture",
+    "clogged",
+    "pore",
+    "pores",
+    "congestion",
+    "blackhead",
+    "whitehead",
+    "comed",
+    "rough",
+    "uneven surface",
+    "bumpy",
+    "bumpiness",
+  ]);
+
+  if (hasRealTextureSignal) {
+    return false;
+  }
+
+  return containsAnyTerm(normalized, [
+    "discoloration",
+    "darker",
+    "uneven tone",
+    "markings",
+    "birthmark",
+    "age-related changes",
+    "age related changes",
+    "slightly darker",
+  ]);
+}
+
 function isMaintenanceMode(json: SkinAnalysisResponse): boolean {
   return json.disclaimers.some((item) =>
     item.includes("Low-concern maintenance mode was applied")
@@ -452,6 +700,38 @@ function isAgingSupportMode(json: SkinAnalysisResponse): boolean {
   return json.disclaimers.some((item) =>
     item.includes("Aging-support mode was applied")
   );
+}
+
+function isFocalLesionMode(json: SkinAnalysisResponse): boolean {
+  return json.disclaimers.some((item) =>
+    item.includes("Focal-lesion mode was applied")
+  );
+}
+
+function isPigmentPatternMode(json: SkinAnalysisResponse): boolean {
+  return json.disclaimers.some((item) =>
+    item.includes("Pigment-pattern mode was applied")
+  );
+}
+
+function isBarrierConditionMode(json: SkinAnalysisResponse): boolean {
+  return json.disclaimers.some((item) =>
+    item.includes("Barrier-condition mode was applied")
+  );
+}
+
+function isFollicularVariantMode(json: SkinAnalysisResponse): boolean {
+  return json.disclaimers.some((item) =>
+    item.includes("Follicular-variant mode was applied")
+  );
+}
+
+function containsPatternTerms(
+  text: string,
+  patterns: readonly (readonly string[])[]
+): boolean {
+  const normalized = text.toLowerCase();
+  return patterns.some((terms) => containsAnyTerm(normalized, terms));
 }
 
 function formatWeeklyBase(prefix: "Daily base (AM)" | "Daily base (PM)", steps: string[]): string {
@@ -884,7 +1164,40 @@ Rules:
         evidence: asNonEmptyString(concern?.evidence) || undefined,
       })).filter((concern) => {
         const evidence = concern.evidence ?? "";
-        return !isWeakCosmeticOnlyEvidence(evidence);
+        if (isWeakCosmeticOnlyEvidence(evidence)) {
+          return false;
+        }
+
+        if (
+          (concern.name === "Texture / clogged pores" ||
+            concern.name === "Post-inflammatory hyperpigmentation (PIH)") &&
+          isBenignPigmentEvidence(evidence)
+        ) {
+          return false;
+        }
+
+        if (
+          concern.name === "Texture / clogged pores" &&
+          isWeakTextureOnlyEvidence(evidence)
+        ) {
+          return false;
+        }
+
+        if (
+          concern.name === "Texture / clogged pores" &&
+          hasFocalLesionLanguage(evidence)
+        ) {
+          return false;
+        }
+
+        if (
+          concern.name === "Post-inflammatory hyperpigmentation (PIH)" &&
+          hasFocalLesionLanguage(evidence)
+        ) {
+          return false;
+        }
+
+        return true;
       }),
       ingredients: (Array.isArray(json.ingredients) ? json.ingredients : []).map(
         (ingredient) => ({
@@ -924,6 +1237,531 @@ Rules:
     };
   }
 
+  private routeSuspiciousMedicalResults(
+    json: SkinAnalysisResponse
+  ): SkinAnalysisResponse {
+    const evidenceText = stringifyForComplianceCheck([
+      json.explanation,
+      json.concerns,
+      json.disclaimers,
+    ]).toLowerCase();
+
+    if (!containsPatternTerms(evidenceText, [ACTINIC_TERMS])) {
+      return json;
+    }
+
+    return {
+      ...json,
+      concerns: [
+        {
+          name: "Redness / irritation",
+          severity: "Moderate",
+          confidence: 0.55,
+          evidence:
+            "A persistent rough or suspicious-looking patch is visible, which is not a routine cosmetic-texture pattern.",
+        },
+      ],
+      escalation: {
+        level: "medical_review",
+        reason:
+          "The visible patch looks suspicious or rough in a way that deserves in-person medical evaluation rather than routine skincare optimization.",
+      },
+      explanation: {
+        skinTypeExplanation:
+          "The image suggests a persistent rough or suspicious-looking area rather than an ordinary skincare concern, so the plan should stay supportive until it is assessed clinically.",
+        productBenefits: [
+          "The routine limits extra irritation while keeping the surrounding skin clean, moisturized, and sun protected.",
+          "It intentionally avoids trying to treat a potentially medical lesion as if it were acne, clogged pores, or simple texture.",
+        ],
+        layeringGuide: [
+          "Keep the routine simple: gentle cleanser, moisturizer, and sunscreen.",
+          "Do not scrub or aggressively exfoliate a persistent rough or scaly patch.",
+          "Arrange an in-person skin evaluation if the area is persistent, enlarging, tender, or repeatedly crusting.",
+        ],
+      },
+      disclaimers: [
+        ...json.disclaimers,
+        "Suspicious-patch mode was applied because the visible findings looked more like a persistent rough lesion than a routine skincare concern.",
+      ],
+    };
+  }
+
+  private routePigmentPatternResults(
+    json: SkinAnalysisResponse
+  ): SkinAnalysisResponse {
+    if (json.escalation.level !== "none") {
+      return json;
+    }
+
+    const evidenceText = stringifyForComplianceCheck([
+      json.explanation,
+      json.concerns,
+      json.disclaimers,
+    ]).toLowerCase();
+
+    if (!containsPatternTerms(evidenceText, [MELASMA_TERMS, LENTIGINE_TERMS])) {
+      return json;
+    }
+
+    return {
+      ...json,
+      skinType: {
+        type: json.skinType.type || "Normal",
+        confidence: Math.max(json.skinType.confidence, 0.6),
+      },
+      concerns: [
+        {
+          name: "Post-inflammatory hyperpigmentation (PIH)",
+          severity: "Moderate",
+          confidence: 0.65,
+          evidence:
+            "Visible pigment patches or sun-spot style markings are present without a primary acne or clogged-pore pattern.",
+        },
+      ],
+      ingredients: [
+        {
+          ingredient: "Azelaic Acid",
+          reason: "Supports a practical pigment-focused routine without defaulting to an acne-style exfoliation plan.",
+          cautions: ["Start slowly if the skin is dry or reactive."],
+        },
+        {
+          ingredient: "Niacinamide",
+          reason: "Helps support tone-evening and barrier resilience alongside strict sunscreen use.",
+          cautions: [],
+        },
+      ],
+      products: json.products.filter((product) =>
+        product.category === "Cleanser" ||
+        product.category === "Moisturizer" ||
+        product.category === "Sunscreen" ||
+        product.category === "Serum"
+      ),
+      routine: {
+        AM: ["Cleanser", "Pigment-support serum", "Moisturizer", "Sunscreen"],
+        PM: ["Cleanser", "Pigment-support serum", "Moisturizer"],
+        weekly: [
+          "Daily base (AM): Cleanser, Pigment-support serum, Moisturizer, Sunscreen",
+          "Daily base (PM): Cleanser, Pigment-support serum, Moisturizer",
+          "Active cycle (Mon–Sun): Mon Pigment-support night | Tue Barrier night | Wed Pigment-support night | Thu Barrier night | Fri Pigment-support night | Sat Barrier night | Sun Barrier night",
+          "Ramp-up (4 weeks): Weeks 1–2 use the pigment-support step every other night; Weeks 3–4 increase to most nights if comfortable; Maintenance keep sunscreen daily and the fewest effective pigment-targeting steps",
+          "Rules: if the skin becomes irritated, reduce the pigment-support step before adding stronger brightening products.",
+        ],
+      },
+      conflicts: [],
+      explanation: {
+        skinTypeExplanation:
+          "The visible pattern looks more pigment-focused than acne-focused, so the routine should prioritize tone support and strict UV protection instead of pore-clearing or breakout treatment.",
+        productBenefits: [
+          "The routine targets pigment-style unevenness with gentler tone-support steps rather than defaulting to an acne routine.",
+          "Daily sunscreen is essential because melasma- or sun-spot-like patterns tend to worsen with continued UV exposure.",
+        ],
+        layeringGuide: [
+          "Apply the pigment-support serum after cleansing and before moisturizer.",
+          "Keep sunscreen as the final morning step every day, even on cloudy days.",
+          "Avoid stacking multiple strong brightening acids at the same time unless the skin is clearly tolerating the plan.",
+        ],
+      },
+      disclaimers: [
+        ...json.disclaimers.filter((item) => !item.includes("Low-concern maintenance mode was applied")),
+        "Pigment-pattern mode was applied because the visible findings looked more like melasma or sun-spot style pigmentation than acne-style texture.",
+      ],
+    };
+  }
+
+  private routeHypopigmentResults(
+    json: SkinAnalysisResponse
+  ): SkinAnalysisResponse {
+    const evidenceText = stringifyForComplianceCheck([
+      json.explanation,
+      json.concerns,
+      json.disclaimers,
+    ]).toLowerCase();
+
+    if (!containsPatternTerms(evidenceText, [HYPOPIGMENT_TERMS])) {
+      return json;
+    }
+
+    return {
+      ...json,
+      skinType: {
+        type: "Sensitive-leaning",
+        confidence: Math.min(Math.max(json.skinType.confidence, 0.45), 0.65),
+      },
+      concerns: [],
+      ingredients: [
+        {
+          ingredient: "Ceramides",
+          reason: "Support the surrounding skin barrier without pushing unnecessary brightening or acne treatment.",
+          cautions: [],
+        },
+      ],
+      products: json.products.filter((product) =>
+        product.category === "Cleanser" ||
+        product.category === "Moisturizer" ||
+        product.category === "Sunscreen"
+      ),
+      routine: {
+        AM: ["Cleanser", "Moisturizer", "Sunscreen"],
+        PM: ["Cleanser", "Moisturizer"],
+        weekly: [
+          "Daily base (AM): Cleanser, Moisturizer, Sunscreen",
+          "Daily base (PM): Cleanser, Moisturizer",
+          "Active cycle (Mon–Sun): Mon Barrier night | Tue Barrier night | Wed Barrier night | Thu Barrier night | Fri Barrier night | Sat Barrier night | Sun Barrier night",
+          "Ramp-up (4 weeks): Weeks 1–2 keep the routine gentle and do not add brightening or acne actives; Weeks 3–4 continue only supportive care unless a clinician advises otherwise; Maintenance prioritize sun protection and observation",
+          "Rules: do not try to treat pigment-loss patterns like acne or clogged pores; if patches expand or new areas appear, arrange clinical evaluation.",
+        ],
+      },
+      conflicts: [],
+      escalation: {
+        level: "monitor",
+        reason:
+          "The visible pattern looks more like pigment loss than a routine cosmetic concern, so a supportive follow-up plan is safer than an acne or brightening routine.",
+      },
+      explanation: {
+        skinTypeExplanation:
+          "The visible pattern looks more like pigment loss than a breakout or tone-irregularity pattern, so the routine should stay supportive and non-aggressive.",
+        productBenefits: [
+          "The routine avoids unnecessary actives that do not match a pigment-loss pattern.",
+          "Daily sunscreen helps protect contrast between lighter and surrounding skin from becoming more obvious.",
+        ],
+        layeringGuide: [
+          "Keep the routine simple: cleanser, moisturizer, sunscreen.",
+          "Avoid trying to correct lighter patches with acne or brightening products.",
+          "Use sunscreen as the final morning step every day.",
+        ],
+      },
+      disclaimers: [
+        ...json.disclaimers.filter((item) => !item.includes("Low-concern maintenance mode was applied")),
+        "Hypopigment mode was applied because the visible findings looked more like vitiligo or pigment loss than acne or clogged pores.",
+      ],
+    };
+  }
+
+  private routeBarrierConditionResults(
+    json: SkinAnalysisResponse
+  ): SkinAnalysisResponse {
+    const evidenceText = stringifyForComplianceCheck([
+      json.explanation,
+      json.concerns,
+      json.disclaimers,
+    ]).toLowerCase();
+    const hasBarrierCondition = containsPatternTerms(evidenceText, [
+      ROSACEA_TERMS,
+      SEB_DERM_TERMS,
+      PERIORAL_DERM_TERMS,
+      ECZEMA_TERMS,
+      PSORIASIS_TERMS,
+      COLD_SORE_TERMS,
+      ANGULAR_CHEILITIS_TERMS,
+    ]);
+
+    if (!hasBarrierCondition) {
+      return json;
+    }
+
+    const rosaceaLike = containsPatternTerms(evidenceText, [ROSACEA_TERMS]);
+    const psoriasiform = containsPatternTerms(evidenceText, [PSORIASIS_TERMS]);
+    const coldSoreLike = containsPatternTerms(evidenceText, [COLD_SORE_TERMS]);
+
+    return {
+      ...json,
+      skinType: {
+        type: "Sensitive-leaning",
+        confidence: Math.min(Math.max(json.skinType.confidence, 0.45), 0.65),
+      },
+      concerns: [
+        {
+          name: "Redness / irritation",
+          severity: psoriasiform || coldSoreLike ? "Moderate" : "Mild",
+          confidence: 0.65,
+          evidence:
+            "Visible redness, scaling, or irritation cues suggest a barrier- or inflammation-led pattern rather than classic acne congestion.",
+        },
+        {
+          name: "Barrier impairment",
+          severity: "Mild",
+          confidence: 0.55,
+          evidence:
+            "The visible pattern suggests the skin barrier may be easily irritated, dry, or reactive.",
+        },
+      ],
+      ingredients: rosaceaLike
+        ? [
+            {
+              ingredient: "Azelaic Acid",
+              reason: "Can be a practical redness-supportive active when the pattern looks rosacea-like and the skin tolerates it.",
+              cautions: ["Start slowly and stop if burning or stinging increases."],
+            },
+            {
+              ingredient: "Ceramides",
+              reason: "Support barrier repair and help reduce irritation from an already-reactive pattern.",
+              cautions: [],
+            },
+          ]
+        : [
+            {
+              ingredient: "Ceramides",
+              reason: "Support barrier repair and help reduce irritation from an already-reactive pattern.",
+              cautions: [],
+            },
+            {
+              ingredient: "Glycerin",
+              reason: "Helps maintain hydration without pushing a treatment-heavy routine.",
+              cautions: [],
+            },
+          ],
+      products: json.products.filter((product) =>
+        product.category === "Cleanser" ||
+        product.category === "Moisturizer" ||
+        product.category === "Sunscreen"
+      ),
+      routine: {
+        AM: ["Cleanser", rosaceaLike ? "Redness-support serum" : "Moisturizer", "Sunscreen"],
+        PM: rosaceaLike
+          ? ["Cleanser", "Redness-support serum", "Moisturizer"]
+          : ["Cleanser", "Moisturizer"],
+        weekly: [
+          `Daily base (AM): Cleanser, ${rosaceaLike ? "Redness-support serum, " : ""}Moisturizer, Sunscreen`,
+          `Daily base (PM): Cleanser, ${rosaceaLike ? "Redness-support serum, " : ""}Moisturizer`,
+          "Active cycle (Mon–Sun): Mon Barrier night | Tue Barrier night | Wed Barrier night | Thu Barrier night | Fri Barrier night | Sat Barrier night | Sun Barrier night",
+          "Ramp-up (4 weeks): Weeks 1–2 keep the routine gentle and avoid extra exfoliants; Weeks 3–4 only add one supportive step if the skin stays calm; Maintenance favor consistency over stronger treatment cycling",
+          "Rules: if flushing, scaling, burning, cracking, or irritation worsens, reduce actives and seek in-person evaluation rather than escalating acne-style products.",
+        ],
+      },
+      conflicts: [],
+      escalation: {
+        level: psoriasiform || coldSoreLike ? "monitor" : "monitor",
+        reason:
+          "The visible pattern looks inflammation- or barrier-led rather than like routine acne or clogged pores, so a gentle follow-up plan is more appropriate.",
+      },
+      explanation: {
+        skinTypeExplanation:
+          "The visible findings look more like a barrier- or inflammation-led pattern than a pore-clogging acne pattern, so the routine should stay gentle and non-irritating.",
+        productBenefits: [
+          "The routine minimizes common triggers from exfoliants, scrubs, and treatment stacking while still supporting cleansing, moisture, and sun protection.",
+          rosaceaLike
+            ? "A modest redness-supportive step can be reasonable here, but only if the skin tolerates it."
+            : "The plan prioritizes barrier repair first, because over-treating reactive skin often worsens the pattern.",
+        ],
+        layeringGuide: [
+          "Use the fewest necessary steps and avoid harsh exfoliating cleansers or scrubs.",
+          rosaceaLike
+            ? "If using a redness-support serum, apply it after cleansing and before moisturizer."
+            : "Apply moisturizer soon after cleansing to reduce barrier dryness and stinging.",
+          "Keep sunscreen as the final morning step and avoid adding multiple new actives at once.",
+        ],
+      },
+      disclaimers: [
+        ...json.disclaimers.filter((item) => !item.includes("Low-concern maintenance mode was applied")),
+        "Barrier-condition mode was applied because the visible findings looked more like rosacea, dermatitis, seborrheic dermatitis, psoriasis, or a lip-area inflammatory pattern than classic acne.",
+      ],
+    };
+  }
+
+  private routeFollicularVariantResults(
+    json: SkinAnalysisResponse,
+    prefs: {
+      pregnancySafe: boolean;
+    }
+  ): SkinAnalysisResponse {
+    if (json.escalation.level !== "none") {
+      return json;
+    }
+
+    const evidenceText = stringifyForComplianceCheck([
+      json.explanation,
+      json.concerns,
+      json.disclaimers,
+    ]).toLowerCase();
+    const miliaLike = containsPatternTerms(evidenceText, [MILIA_TERMS]);
+    const folliculitisLike = containsPatternTerms(evidenceText, [FOLLICULITIS_TERMS]);
+
+    if (!miliaLike && !folliculitisLike) {
+      return json;
+    }
+
+    return {
+      ...json,
+      concerns: miliaLike
+        ? [
+            {
+              name: "Texture / clogged pores",
+              severity: "Mild",
+              confidence: 0.55,
+              evidence:
+                "Tiny white bump-like texture is visible, but it does not read as a typical inflamed acne pattern.",
+            },
+          ]
+        : [
+            {
+              name: "Inflammatory acne",
+              severity: "Mild",
+              confidence: 0.55,
+              evidence:
+                "Small follicular or razor-bump-style bumps are visible, which may behave differently from classic acne.",
+            },
+          ],
+      ingredients:
+        miliaLike && !prefs.pregnancySafe
+          ? [
+              {
+                ingredient: "Retinal",
+                reason: "A slow retinoid-style step can sometimes be more useful for tiny milia-like bumps than random exfoliation stacking.",
+                cautions: ["Use on non-consecutive nights first and stop if irritation develops."],
+              },
+            ]
+          : [
+              {
+                ingredient: "Ceramides",
+                reason: "Support the barrier while keeping the routine non-irritating around follicular bumps.",
+                cautions: [],
+              },
+            ],
+      products: json.products.filter((product) =>
+        product.category === "Cleanser" ||
+        product.category === "Moisturizer" ||
+        product.category === "Sunscreen" ||
+        product.category === "Serum"
+      ),
+      routine: {
+        AM: ["Cleanser", "Moisturizer", "Sunscreen"],
+        PM: miliaLike && !prefs.pregnancySafe
+          ? ["Cleanser", "Treatment serum - 2x-week to start - use a retinoid-style step if tolerated", "Moisturizer"]
+          : ["Cleanser", "Moisturizer"],
+        weekly: [
+          "Daily base (AM): Cleanser, Moisturizer, Sunscreen",
+          miliaLike && !prefs.pregnancySafe
+            ? "Daily base (PM): Cleanser, Treatment serum - 2x-week to start - use a retinoid-style step if tolerated, Moisturizer"
+            : "Daily base (PM): Cleanser, Moisturizer",
+          miliaLike
+            ? "Active cycle (Mon–Sun): Mon Texture-support night | Tue Barrier night | Wed Barrier night | Thu Texture-support night | Fri Barrier night | Sat Barrier night | Sun Barrier night"
+            : "Active cycle (Mon–Sun): Mon Barrier night | Tue Barrier night | Wed Barrier night | Thu Barrier night | Fri Barrier night | Sat Barrier night | Sun Barrier night",
+          miliaLike
+            ? "Ramp-up (4 weeks): Weeks 1–2 use the texture-support step once weekly; Weeks 3–4 increase to twice weekly if calm; Maintenance keep the lowest effective frequency"
+            : "Ramp-up (4 weeks): Weeks 1–2 keep the routine non-irritating and avoid heavy occlusives; Weeks 3–4 only add targeted steps if the bump pattern is clearly improving; Maintenance reassess if the pattern persists",
+          "Rules: do not pick or aggressively scrub follicular bumps, and reassess if the pattern persists or worsens despite a gentle routine.",
+        ],
+      },
+      conflicts: [],
+      escalation: {
+        level: folliculitisLike ? "monitor" : "none",
+        reason: folliculitisLike
+          ? "The bump pattern may behave differently from classic acne, so a cautious follow-up approach is more reliable than escalating acne treatments quickly."
+          : "The visible bumps look mild and non-inflamed, so a low-irritation texture-support plan is reasonable.",
+      },
+      explanation: {
+        skinTypeExplanation:
+          "The visible bumps look like a follicular-variant pattern rather than a standard breakout pattern, so the routine should avoid overusing acne-style actives.",
+        productBenefits: [
+          miliaLike
+            ? "A slow texture-support approach is usually more practical here than treating the area like inflamed acne."
+            : "The plan stays gentle and non-occlusive so it does not worsen follicular irritation with unnecessary treatment stacking.",
+          "Daily sunscreen and a low-irritation base routine help prevent the area from becoming more reactive while you reassess the pattern.",
+        ],
+        layeringGuide: [
+          "Keep the base routine simple and non-occlusive.",
+          miliaLike && !prefs.pregnancySafe
+            ? "If using a texture-support serum, apply it after cleansing and before moisturizer on non-consecutive nights."
+            : "Avoid scrubs and harsh leave-on acids unless the pattern clearly behaves like classic acne.",
+          "Use sunscreen as the final morning step every day.",
+        ],
+      },
+      disclaimers: [
+        ...json.disclaimers.filter((item) => !item.includes("Low-concern maintenance mode was applied")),
+        "Follicular-variant mode was applied because the visible bumps looked more like milia or folliculitis than classic acne.",
+      ],
+    };
+  }
+
+  private routeFocalLesionResults(
+    json: SkinAnalysisResponse
+  ): SkinAnalysisResponse {
+    if (json.escalation.level === "medical_review") {
+      return json;
+    }
+
+    const evidenceText = stringifyForComplianceCheck([
+      json.explanation,
+      json.concerns,
+      json.disclaimers,
+    ]).toLowerCase();
+    const hasExplicitLesionLanguage = hasFocalLesionLanguage(evidenceText);
+    const hasLocalizedRaisedBumpConcern = (json.concerns ?? []).some((concern) =>
+      isLocalizedRaisedBumpEvidence(concern.evidence ?? "")
+    );
+    const hasDiffuseAcnePattern = hasConcern(json.concerns, [
+      "Comedonal acne",
+      "Excess oil / sebum",
+      "Post-inflammatory hyperpigmentation (PIH)",
+      "Post-inflammatory erythema (PIE)",
+    ]) || (json.concerns ?? []).filter((concern) => concern.name === "Inflammatory acne").length > 1;
+
+    if (!hasExplicitLesionLanguage && !(hasLocalizedRaisedBumpConcern && !hasDiffuseAcnePattern)) {
+      return json;
+    }
+
+    return {
+      ...json,
+      skinType: {
+        type: "Sensitive-leaning",
+        confidence: Math.min(json.skinType.confidence, 0.35),
+      },
+      explanation: {
+        skinTypeExplanation:
+          "The image appears to show a focal spot or growth-like finding rather than a diffuse skincare pattern, so a standard acne or texture routine would be a poor fit.",
+        productBenefits: [
+          "The routine stays limited to gentle cleansing, moisturizer, and sunscreen so it does not irritate a localized lesion-like area.",
+          "A focused skin check is safer than trying to exfoliate or treat a mole-, wart-, tag-, or cyst-like spot as ordinary congestion.",
+        ],
+        layeringGuide: [
+          "Keep the routine basic: cleanser first, moisturizer second, and sunscreen as the final morning step.",
+          "Do not scrub, pick, or layer strong acids or retinoids directly onto a focal raised spot unless a clinician has advised it.",
+          "If the spot changes, becomes irritated, bleeds, or grows, prioritize an in-person skin evaluation.",
+        ],
+      },
+      concerns: [],
+      ingredients: [
+        {
+          ingredient: "Ceramides",
+          reason: "Support the surrounding skin barrier without pushing an aggressive treatment plan onto a focal lesion-like area.",
+          cautions: [],
+        },
+      ],
+      products: json.products
+        .filter((product) =>
+          product.category === "Cleanser" ||
+          product.category === "Moisturizer" ||
+          product.category === "Sunscreen"
+        )
+        .slice(0, 3),
+      routine: {
+        AM: ["Cleanser", "Moisturizer", "Sunscreen"],
+        PM: ["Cleanser", "Moisturizer"],
+        weekly: [
+          "Daily base (AM): Cleanser, Moisturizer, Sunscreen",
+          "Daily base (PM): Cleanser, Moisturizer",
+          "Active cycle (Mon–Sun): Mon Barrier night | Tue Barrier night | Wed Barrier night | Thu Barrier night | Fri Barrier night | Sat Barrier night | Sun Barrier night",
+          "Ramp-up (4 weeks): Weeks 1–2 keep the routine gentle and do not spot-treat the lesion-like area; Weeks 3–4 only continue basic care unless a clinician advises otherwise; Maintenance prioritize observation over experimenting with stronger actives",
+          "Rules: if the spot is raised, rapidly changing, painful, bleeding, or persistent, do not treat it like acne or clogged pores and arrange a clinical skin check",
+        ],
+      },
+      conflicts: [],
+      escalation: {
+        level: "monitor",
+        reason:
+          "The visible finding looks focal or growth-like rather than like a routine skincare concern, so a cautious follow-up plan is more appropriate than a treatment routine.",
+      },
+      disclaimers: [
+        ...json.disclaimers.filter(
+          (item) =>
+            !item.includes("Low-concern maintenance mode was applied") &&
+            !item.includes("Aging-support mode was applied")
+        ),
+        "Focal-lesion mode was applied because the visible finding looked more like a mole, wart, tag, cyst, or localized growth than ordinary acne-style texture.",
+      ],
+    };
+  }
+
   private strengthenForRoutineIntensity(
     json: SkinAnalysisResponse,
     prefs: {
@@ -935,7 +1773,11 @@ Rules:
     if (
       prefs.routineIntensity !== "more_active" ||
       prefs.sensitiveMode ||
-      json.escalation.level !== "none"
+      json.escalation.level !== "none" ||
+      isPigmentPatternMode(json) ||
+      isBarrierConditionMode(json) ||
+      isFollicularVariantMode(json) ||
+      isFocalLesionMode(json)
     ) {
       return json;
     }
@@ -1228,6 +2070,7 @@ Rules:
       }),
       products: [...json.products],
       ingredients: [...json.ingredients],
+      conflicts: [...json.conflicts],
       routine: {
         AM: [...json.routine.AM],
         PM: [...json.routine.PM],
@@ -1282,6 +2125,17 @@ Rules:
         next.routine.AM = ["Cleanser", "Moisturizer", "Sunscreen"];
         next.routine.PM = ["Cleanser", "Moisturizer"];
       }
+
+      const activeText = stringifyForComplianceCheck([
+        next.ingredients,
+        next.products,
+        next.routine,
+      ]).toLowerCase();
+      next.conflicts = next.conflicts.filter((conflict) =>
+        conflict.ingredients.some((ingredient) =>
+          containsAnyTerm(activeText, [ingredient.toLowerCase()])
+        )
+      );
     }
 
     const desiredActiveCycle =
@@ -1581,6 +2435,13 @@ EVIDENCE RULE:
 - For each concern, include visible evidence from the image.
 - If lighting, angle, or resolution limits confidence, state that.
 - Do not claim specific lesion types, pigmentation types, or irritation patterns unless they are visually supportable.
+- Freckles alone are not acne, clogged pores, or a reason for an exfoliating treatment plan.
+- If the image shows a focal mole-, tag-, wart-, cyst-, or growth-like spot, do not treat it as ordinary texture or acne. Set escalation.level to at least "monitor" and keep the routine gentle and non-aggressive.
+- If the image suggests rosacea, melasma, solar lentigines, seborrheic dermatitis, perioral dermatitis, eczema, psoriasis, folliculitis, milia, vitiligo, cold sores, angular cheilitis, or a suspicious rough patch, name that pattern plainly when supportable and do not flatten it into generic acne.
+- Rosacea / dermatitis / seborrheic dermatitis / psoriasis patterns should bias toward barrier-first, low-irritation care rather than exfoliating or acne-style routines.
+- Melasma / sun-spot / pigment patterns should bias toward sunscreen and pigment-support steps rather than pore-clearing or acne-treatment steps.
+- Vitiligo or hypopigment patterns should not receive brightening or acne-focused advice.
+- Milia or folliculitis patterns should not automatically be treated as classic acne.
 - If the visible severity appears beyond what skincare alone is likely to help, set escalation.level to "medical_review" and explain why plainly.
 - For escalation.level="medical_review", do not give an aggressive treatment plan. Return a supportive care routine and make clear that in-person dermatology evaluation should be considered.
 
@@ -1647,11 +2508,19 @@ FINAL CHECK BEFORE YOU ANSWER:
     const isMedicalReview = json.escalation?.level === "medical_review";
     const maintenanceMode = isMaintenanceMode(json);
     const agingSupportMode = isAgingSupportMode(json);
+    const focalLesionMode = isFocalLesionMode(json);
+    const pigmentPatternMode = isPigmentPatternMode(json);
+    const barrierConditionMode = isBarrierConditionMode(json);
+    const follicularVariantMode = isFollicularVariantMode(json);
 
     if (
       !isMedicalReview &&
       !maintenanceMode &&
       !agingSupportMode &&
+      !focalLesionMode &&
+      !pigmentPatternMode &&
+      !barrierConditionMode &&
+      !follicularVariantMode &&
       (amLen < minAm || pmLen < minPm)
     ) {
       warnings.push(
@@ -1676,7 +2545,15 @@ FINAL CHECK BEFORE YOU ANSWER:
     if (!weeklyText.includes("rules:")) {
       warnings.push("Weekly plan is missing pause or irritation rules.");
     }
-    if (!isMedicalReview && !maintenanceMode && productsLen < 4) {
+    if (
+      !isMedicalReview &&
+      !maintenanceMode &&
+      !focalLesionMode &&
+      !pigmentPatternMode &&
+      !barrierConditionMode &&
+      !follicularVariantMode &&
+      productsLen < 4
+    ) {
       warnings.push("Product coverage is narrower than target.");
     }
     if (!json?.explanation?.skinTypeExplanation?.trim()) {
@@ -1902,6 +2779,12 @@ FINAL CHECK BEFORE YOU ANSWER:
 
       logger.info("Validation success: response matches schema.");
 
+      json = this.routeSuspiciousMedicalResults(json);
+      json = this.routeHypopigmentResults(json);
+      json = this.routePigmentPatternResults(json);
+      json = this.routeBarrierConditionResults(json);
+      json = this.routeFollicularVariantResults(json, userPreferences);
+      json = this.routeFocalLesionResults(json);
       json = this.applyEscalationGuardrails(json);
       json = this.lightenLowConcernResults(json, userPreferences);
       json = this.alignRoutineToConcernFamily(json, userPreferences);
